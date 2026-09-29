@@ -1,0 +1,362 @@
+<?php
+/**
+ * Loads Stillframe assets for administrators.
+ *
+ * @package Stillframe
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Enqueues the admin bar script only. The capture library loads later, from the browser.
+ */
+class Stillframe_Asset_Loader {
+
+	/**
+	 * Query arguments that must not be replayed inside the capture frame.
+	 *
+	 * @var string[]
+	 */
+	public const STRIPPED_QUERY_ARGS = array(
+		'action',
+		'_wpnonce',
+		'nonce',
+		'_wp_http_referer',
+		'wp_customize',
+	);
+
+	/**
+	 * Enqueue the admin bar script and its small style, for administrators only.
+	 *
+	 * @return void
+	 */
+	public function enqueue() {
+		if ( ! $this->should_load() ) {
+			return;
+		}
+
+		$style_url = false;
+		wp_register_style( 'stillframe-admin-bar', $style_url, array(), STILLFRAME_VERSION );
+		wp_enqueue_style( 'stillframe-admin-bar' );
+		wp_add_inline_style( 'stillframe-admin-bar', $this->admin_bar_css() );
+
+		$base = trailingslashit( plugin_dir_url( STILLFRAME_FILE ) );
+
+		wp_register_style(
+			'stillframe-capture-panel',
+			$base . 'assets/css/stillframe-capture-panel.css',
+			array(),
+			STILLFRAME_VERSION
+		);
+
+		wp_register_script(
+			'stillframe-annotation-editor',
+			$base . 'assets/js/stillframe-annotation-editor.js',
+			array(),
+			STILLFRAME_VERSION,
+			true
+		);
+
+		wp_register_script(
+			'stillframe-capture-panel',
+			$base . 'assets/js/stillframe-capture-panel.js',
+			array( 'stillframe-annotation-editor' ),
+			STILLFRAME_VERSION,
+			true
+		);
+
+		wp_enqueue_script(
+			'stillframe-admin-bar',
+			$base . 'assets/js/stillframe-admin-bar.js',
+			array(),
+			STILLFRAME_VERSION,
+			true
+		);
+
+		$config = array(
+			'pluginUrl'    => $base,
+			'version'      => STILLFRAME_VERSION,
+			'currentUrl'   => $this->current_screen_url(),
+			'presets'      => $this->device_width_presets(),
+			'scales'       => $this->scale_choices(),
+			'defaultScale' => 2,
+			'defaultPreset' => 'desktop',
+			'minWidth'     => 320,
+			'maxWidth'     => 2560,
+			'stripArgs'    => self::STRIPPED_QUERY_ARGS,
+			'i18n'         => $this->script_strings(),
+		);
+
+		wp_add_inline_script(
+			'stillframe-admin-bar',
+			'window.StillframeCapture = window.StillframeCapture || {}; window.StillframeCapture.config = ' . wp_json_encode( $config ) . ';',
+			'before'
+		);
+
+		/**
+		 * Fires when Stillframe has prepared the capture panel for an administrator.
+		 *
+		 * The panel markup is built in the browser after the admin bar item is opened.
+		 * Version 0.1.0 does not print the panel from PHP.
+		 */
+		do_action( 'stillframe_capture_panel_rendered' );
+	}
+
+	/**
+	 * Whether this request should receive Stillframe assets.
+	 *
+	 * @return bool
+	 */
+	private function should_load() {
+		return stillframe_user_can_capture() && is_admin_bar_showing();
+	}
+
+	/**
+	 * Device widths shown in the panel.
+	 *
+	 * @return array<int, array{id: string, label: string, width: int}>
+	 */
+	private function device_width_presets() {
+		$defaults = array(
+			array(
+				'id'    => 'phone',
+				'label' => __( 'Phone', 'stillframe' ),
+				'width' => 390,
+			),
+			array(
+				'id'    => 'ipad',
+				'label' => __( 'iPad', 'stillframe' ),
+				'width' => 834,
+			),
+			array(
+				'id'    => 'desktop',
+				'label' => __( 'Desktop', 'stillframe' ),
+				'width' => 1440,
+			),
+		);
+
+		/**
+		 * Filters the device width presets shown in the capture panel.
+		 *
+		 * Each item needs an id, a label, and a width from 320 to 2560.
+		 * Custom width is a separate control and is not part of this list.
+		 *
+		 * @param array<int, array{id: string, label: string, width: int}> $presets Width presets.
+		 */
+		$filtered = apply_filters( 'stillframe_device_width_presets', $defaults );
+		if ( ! is_array( $filtered ) ) {
+			$filtered = $defaults;
+		}
+
+		$clean = array();
+		foreach ( $filtered as $preset ) {
+			if ( ! is_array( $preset ) ) {
+				continue;
+			}
+
+			$width = isset( $preset['width'] ) ? (int) $preset['width'] : 0;
+			if ( $width < 320 || $width > 2560 ) {
+				continue;
+			}
+
+			$id = isset( $preset['id'] ) ? sanitize_key( $preset['id'] ) : '';
+			if ( '' === $id ) {
+				continue;
+			}
+
+			$label = isset( $preset['label'] ) ? sanitize_text_field( (string) $preset['label'] ) : (string) $width;
+			if ( '' === $label ) {
+				$label = (string) $width;
+			}
+
+			$clean[] = array(
+				'id'    => $id,
+				'label' => $label,
+				'width' => $width,
+			);
+		}
+
+		if ( empty( $clean ) ) {
+			$clean = array(
+				array(
+					'id'    => 'phone',
+					'label' => __( 'Phone', 'stillframe' ),
+					'width' => 390,
+				),
+				array(
+					'id'    => 'ipad',
+					'label' => __( 'iPad', 'stillframe' ),
+					'width' => 834,
+				),
+				array(
+					'id'    => 'desktop',
+					'label' => __( 'Desktop', 'stillframe' ),
+					'width' => 1440,
+				),
+			);
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Export scales. The default used by the panel is 2.
+	 *
+	 * @return array<int, array{value: int, label: string}>
+	 */
+	private function scale_choices() {
+		return array(
+			array(
+				'value' => 1,
+				'label' => __( '1x', 'stillframe' ),
+			),
+			array(
+				'value' => 2,
+				'label' => __( '2x', 'stillframe' ),
+			),
+			array(
+				'value' => 3,
+				'label' => __( '3x', 'stillframe' ),
+			),
+		);
+	}
+
+	/**
+	 * Strings for the capture panel. They are inserted with textContent in the browser.
+	 *
+	 * @return array<string, string>
+	 */
+	private function script_strings() {
+		return array(
+			'heading'         => esc_html__( 'Capture this screen', 'stillframe' ),
+			'close'           => esc_html__( 'Close', 'stillframe' ),
+			'width'           => esc_html__( 'Width', 'stillframe' ),
+			'custom'          => esc_html__( 'Custom', 'stillframe' ),
+			'customWidth'     => esc_html__( 'Custom width', 'stillframe' ),
+			'scale'           => esc_html__( 'Export scale', 'stillframe' ),
+			'capture'         => esc_html__( 'Capture', 'stillframe' ),
+			'captureWindow'   => esc_html__( 'Capture current window', 'stillframe' ),
+			'download'        => esc_html__( 'Download PNG', 'stillframe' ),
+			'pen'             => esc_html__( 'Pen', 'stillframe' ),
+			'circle'          => esc_html__( 'Circle', 'stillframe' ),
+			'arrow'           => esc_html__( 'Arrow', 'stillframe' ),
+			'undo'            => esc_html__( 'Undo', 'stillframe' ),
+			'clear'           => esc_html__( 'Clear', 'stillframe' ),
+			'tools'           => esc_html__( 'Annotation tools', 'stillframe' ),
+			'capturedAlt'     => esc_html__( 'Captured screen', 'stillframe' ),
+			'frameTitle'      => esc_html__( 'Stillframe capture frame', 'stillframe' ),
+			'capturing'       => esc_html__( 'Capturing this screen.', 'stillframe' ),
+			/* translators: 1: width in CSS pixels, 2: export scale. */
+			'captured'        => esc_html__( 'Captured at %1$d pixels wide and %2$dx. Draw on the picture, then download the PNG.', 'stillframe' ),
+			'preparing'       => esc_html__( 'Preparing the PNG.', 'stillframe' ),
+			'assetsFailed'    => esc_html__( 'Stillframe could not load the capture tools. The page was not changed.', 'stillframe' ),
+			'captureFailed'   => esc_html__( 'The capture failed. The page was not changed.', 'stillframe' ),
+			'captureTimeout'  => esc_html__( 'The capture timed out. The page was not changed.', 'stillframe' ),
+			'frameBlocked'    => esc_html__( 'The frame was blocked, so only the current window can be captured. The page was not changed.', 'stillframe' ),
+			'invalidWidth'    => esc_html__( 'Enter a whole number from 320 to 2560. The page was not changed.', 'stillframe' ),
+			'downloadFailed'  => esc_html__( 'The download failed. The page was not changed.', 'stillframe' ),
+			'libraryMissing'  => esc_html__( 'The capture tool did not load. The page was not changed.', 'stillframe' ),
+		);
+	}
+
+	/**
+	 * Focus style for the admin bar item.
+	 *
+	 * @return string
+	 */
+	private function admin_bar_css() {
+		return '#wpadminbar li#wp-admin-bar-stillframe-capture > .ab-item:focus{outline:2px solid #e85d04;outline-offset:-2px;}';
+	}
+
+	/**
+	 * URL of the screen being viewed, safe to load with a same-origin GET.
+	 *
+	 * The host comes from home_url(). Query arguments that can replay a
+	 * state-changing request are removed before the value ever reaches JavaScript.
+	 *
+	 * @return string
+	 */
+	private function current_screen_url() {
+		$target = $this->request_path_and_query();
+		$origin = $this->home_origin();
+		$url    = remove_query_arg( self::STRIPPED_QUERY_ARGS, $origin . $target );
+		$clean  = esc_url_raw( $url );
+
+		if ( ! is_string( $clean ) || '' === $clean ) {
+			return esc_url_raw( home_url( '/' ) );
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Scheme, host, and port from home_url().
+	 *
+	 * @return string
+	 */
+	private function home_origin() {
+		$parts  = wp_parse_url( home_url( '/' ) );
+		$scheme = 'https';
+		$host   = '';
+
+		if ( is_array( $parts ) && isset( $parts['scheme'] ) && is_string( $parts['scheme'] ) ) {
+			$scheme = $parts['scheme'];
+		}
+
+		if ( is_array( $parts ) && isset( $parts['host'] ) && is_string( $parts['host'] ) ) {
+			$host = $parts['host'];
+		}
+
+		$origin = $scheme . '://' . $host;
+
+		if ( is_array( $parts ) && isset( $parts['port'] ) ) {
+			$origin .= ':' . (int) $parts['port'];
+		}
+
+		return $origin;
+	}
+
+	/**
+	 * Path and query string from the current request, or "/".
+	 *
+	 * @return string
+	 */
+	private function request_path_and_query() {
+		$raw = '/';
+
+		if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+			$raw = esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+		}
+
+		if ( ! is_string( $raw ) || '' === $raw ) {
+			return '/';
+		}
+
+		$parsed = wp_parse_url( $raw );
+		if ( ! is_array( $parsed ) ) {
+			return '/';
+		}
+
+		$path = '/';
+		if ( isset( $parsed['path'] ) && is_string( $parsed['path'] ) && '' !== $parsed['path'] ) {
+			$path = $parsed['path'];
+		}
+
+		if ( '/' !== substr( $path, 0, 1 ) || preg_match( '/[[:cntrl:]\\\\]/', $path ) ) {
+			return '/';
+		}
+
+		if ( strlen( $path ) > 1 && ( '/' === substr( $path, 1, 1 ) || '\\' === substr( $path, 1, 1 ) ) ) {
+			return '/';
+		}
+
+		$target = $path;
+		if ( isset( $parsed['query'] ) && is_string( $parsed['query'] ) && '' !== $parsed['query'] ) {
+			$target .= '?' . $parsed['query'];
+		}
+
+		return $target;
+	}
+}

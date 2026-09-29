@@ -1,0 +1,169 @@
+# Copyright (C) 2026 Stillframe
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Stillframe 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-09-29T08:26:04+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: stillframe\n"
+
+#. Plugin Name of the plugin
+#: stillframe.php
+#: includes/class-stillframe-admin-bar-menu.php:32
+msgid "Stillframe"
+msgstr ""
+
+#. Description of the plugin
+#: stillframe.php
+msgid "Capture a plugin screen, a theme, or any page at phone, tablet, or a custom width, mark it up, and download a PNG."
+msgstr ""
+
+#. Author of the plugin
+#: stillframe.php
+msgid "Grafucci"
+msgstr ""
+
+#: includes/class-stillframe-admin-bar-menu.php:36
+#: includes/class-stillframe-asset-loader.php:233
+msgid "Capture this screen"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:125
+#: includes/class-stillframe-asset-loader.php:185
+msgid "Phone"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:130
+#: includes/class-stillframe-asset-loader.php:190
+msgid "iPad"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:135
+#: includes/class-stillframe-asset-loader.php:195
+msgid "Desktop"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:213
+msgid "1x"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:217
+msgid "2x"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:221
+msgid "3x"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:234
+msgid "Close"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:235
+msgid "Width"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:236
+msgid "Custom"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:237
+msgid "Custom width"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:238
+msgid "Export scale"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:239
+msgid "Capture"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:240
+msgid "Capture current window"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:241
+msgid "Download PNG"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:242
+msgid "Pen"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:243
+msgid "Circle"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:244
+msgid "Arrow"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:245
+msgid "Undo"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:246
+msgid "Clear"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:247
+msgid "Annotation tools"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:248
+msgid "Captured screen"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:249
+msgid "Stillframe capture frame"
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:250
+msgid "Capturing this screen."
+msgstr ""
+
+#. translators: 1: width in CSS pixels, 2: export scale.
+#: includes/class-stillframe-asset-loader.php:252
+#, php-format
+msgid "Captured at %1$d pixels wide and %2$dx. Draw on the picture, then download the PNG."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:253
+msgid "Preparing the PNG."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:254
+msgid "Stillframe could not load the capture tools. The page was not changed."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:255
+msgid "The capture failed. The page was not changed."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:256
+msgid "The capture timed out. The page was not changed."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:257
+msgid "The frame was blocked, so only the current window can be captured. The page was not changed."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:258
+msgid "Enter a whole number from 320 to 2560. The page was not changed."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:259
+msgid "The download failed. The page was not changed."
+msgstr ""
+
+#: includes/class-stillframe-asset-loader.php:260
+msgid "The capture tool did not load. The page was not changed."
+msgstr ""
