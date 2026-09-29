@@ -115,31 +115,50 @@
 		return item.querySelector('a');
 	}
 
-	function onMenuClick(event) {
-		event.preventDefault();
-		var link = event.currentTarget;
-		if (api.isOpen && api.isOpen()) {
+	function launch(source, toggleIfOpen) {
+		if (api.isSnipping && api.isSnipping()) {
+			api.cancelSnip();
+			return;
+		}
+		if (toggleIfOpen && api.isOpen && api.isOpen()) {
 			api.closePanel();
 			return;
 		}
 		ensurePanelAssets().then(function () {
-			if (!api.openPanel) {
+			if (!api.startSnip) {
 				window.alert(text('assetsFailed') || 'Stillframe could not load the capture tools. The page was not changed.');
 				return;
 			}
-			api.openPanel(link);
+			api.startSnip(source);
 		}).catch(function () {
 			window.alert(text('assetsFailed') || 'Stillframe could not load the capture tools. The page was not changed.');
 		});
 	}
 
+	function onMenuClick(event) {
+		event.preventDefault();
+		launch(event.currentTarget, true);
+	}
+
 	function bind() {
 		var link = menuLink();
-		if (!link || link.getAttribute('data-stillframe-bound') === '1') {
-			return;
+		if (link && link.getAttribute('data-stillframe-bound') !== '1') {
+			link.setAttribute('data-stillframe-bound', '1');
+			link.addEventListener('click', onMenuClick);
 		}
-		link.setAttribute('data-stillframe-bound', '1');
-		link.addEventListener('click', onMenuClick);
+		var tools = document.getElementById('stillframe-tools-capture');
+		if (tools && tools.getAttribute('data-stillframe-bound') !== '1') {
+			tools.setAttribute('data-stillframe-bound', '1');
+			tools.addEventListener('click', function (event) {
+				event.preventDefault();
+				launch(tools, false);
+			});
+		}
+		window.setTimeout(function () {
+			ensurePanelAssets().catch(function () {
+				return null;
+			});
+		}, 0);
 	}
 
 	if (document.readyState === 'loading') {

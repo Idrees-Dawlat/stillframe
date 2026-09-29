@@ -81,8 +81,11 @@ class Stillframe_Asset_Loader {
 			'currentUrl'   => $this->current_screen_url(),
 			'presets'      => $this->device_width_presets(),
 			'scales'       => $this->scale_choices(),
-			'defaultScale' => 2,
-			'defaultPreset' => 'desktop',
+			'defaultScale'  => 1,
+			'defaultPreset' => 'screen',
+			'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+			'mediaNonce'    => wp_create_nonce( 'stillframe_save_media' ),
+			'canUpload'     => current_user_can( 'upload_files' ),
 			'minWidth'     => 320,
 			'maxWidth'     => 2560,
 			'stripArgs'    => self::STRIPPED_QUERY_ARGS,
@@ -110,7 +113,27 @@ class Stillframe_Asset_Loader {
 	 * @return bool
 	 */
 	private function should_load() {
-		return stillframe_user_can_capture() && is_admin_bar_showing();
+		if ( ! stillframe_user_can_capture() ) {
+			return false;
+		}
+		if ( is_admin_bar_showing() ) {
+			return true;
+		}
+		return $this->is_tools_screen();
+	}
+
+	/**
+	 * Whether this request is the Stillframe Tools screen.
+	 *
+	 * @return bool
+	 */
+	private function is_tools_screen() {
+		if ( ! is_admin() ) {
+			return false;
+		}
+
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		return 'stillframe' === $page;
 	}
 
 	/**
@@ -232,13 +255,20 @@ class Stillframe_Asset_Loader {
 		return array(
 			'heading'         => esc_html__( 'Capture this screen', 'stillframe' ),
 			'close'           => esc_html__( 'Close', 'stillframe' ),
+			'screen'          => esc_html__( 'This screen', 'stillframe' ),
 			'width'           => esc_html__( 'Width', 'stillframe' ),
 			'custom'          => esc_html__( 'Custom', 'stillframe' ),
 			'customWidth'     => esc_html__( 'Custom width', 'stillframe' ),
 			'scale'           => esc_html__( 'Export scale', 'stillframe' ),
 			'capture'         => esc_html__( 'Capture', 'stillframe' ),
 			'captureWindow'   => esc_html__( 'Capture current window', 'stillframe' ),
-			'download'        => esc_html__( 'Download PNG', 'stillframe' ),
+			'capturingWidth'  => esc_html__( 'Reloading this page at the chosen width.', 'stillframe' ),
+			'download'        => esc_html__( 'Download', 'stillframe' ),
+			'saveMedia'       => esc_html__( 'Save to Media', 'stillframe' ),
+			'savingMedia'     => esc_html__( 'Saving to the Media Library.', 'stillframe' ),
+			'savedMedia'      => esc_html__( 'Saved to the Media Library.', 'stillframe' ),
+			'viewMedia'       => esc_html__( 'View', 'stillframe' ),
+			'mediaFailed'     => esc_html__( 'The media save failed. The page was not changed.', 'stillframe' ),
 			'pen'             => esc_html__( 'Pen', 'stillframe' ),
 			'circle'          => esc_html__( 'Circle', 'stillframe' ),
 			'arrow'           => esc_html__( 'Arrow', 'stillframe' ),
@@ -258,6 +288,20 @@ class Stillframe_Asset_Loader {
 			'invalidWidth'    => esc_html__( 'Enter a whole number from 320 to 2560. The page was not changed.', 'stillframe' ),
 			'downloadFailed'  => esc_html__( 'The download failed. The page was not changed.', 'stillframe' ),
 			'libraryMissing'  => esc_html__( 'The capture tool did not load. The page was not changed.', 'stillframe' ),
+			'snipHint'        => esc_html__( 'Drag to select an area', 'stillframe' ),
+			'snipFull'        => esc_html__( 'Full view', 'stillframe' ),
+			'topBar'          => esc_html__( 'Top bar', 'stillframe' ),
+			'sideMenu'        => esc_html__( 'Side menu', 'stillframe' ),
+			'plugins'         => esc_html__( 'Plugins', 'stillframe' ),
+			'pluginsAll'      => esc_html__( 'Everything', 'stillframe' ),
+			'pluginsClean'    => esc_html__( 'Clean WordPress', 'stillframe' ),
+			'pluginsChoose'   => esc_html__( 'Choose', 'stillframe' ),
+			'pluginsHelp'     => esc_html__( 'Clean WordPress hides other plugin menus, notices, and extra dashboard boxes.', 'stillframe' ),
+			'notices'         => esc_html__( 'Admin notices', 'stillframe' ),
+			'cancel'          => esc_html__( 'Cancel', 'stillframe' ),
+			'widths'          => esc_html__( 'Widths', 'stillframe' ),
+			'topBarHelp'      => esc_html__( 'Include the top bar', 'stillframe' ),
+			'sideMenuHelp'    => esc_html__( 'Include the side menu', 'stillframe' ),
 		);
 	}
 
@@ -267,7 +311,7 @@ class Stillframe_Asset_Loader {
 	 * @return string
 	 */
 	private function admin_bar_css() {
-		return '#wpadminbar li#wp-admin-bar-stillframe-capture > .ab-item:focus{outline:2px solid #e85d04;outline-offset:-2px;}';
+		return '#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:hover,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:focus{outline:none;box-shadow:none;border:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon{margin-right:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon:before{content:"\f306";top:2px;}#wpadminbar #wp-admin-bar-stillframe-capture .screen-reader-text{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}';
 	}
 
 	/**

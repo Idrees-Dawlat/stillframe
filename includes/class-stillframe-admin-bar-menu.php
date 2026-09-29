@@ -29,7 +29,7 @@ class Stillframe_Admin_Bar_Menu {
 			array(
 				'id'     => 'stillframe-capture',
 				'parent' => 'top-secondary',
-				'title'  => esc_html__( 'Stillframe', 'stillframe' ),
+				'title'  => '<span class="ab-icon" aria-hidden="true"></span><span class="screen-reader-text">' . esc_html__( 'Capture this screen', 'stillframe' ) . '</span>',
 				'href'   => '#stillframe-capture',
 				'meta'   => array(
 					'class' => 'stillframe-admin-bar-node',

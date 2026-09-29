@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Wires the admin bar item and asset loader.
+ * Wires the admin bar item, Tools screen, and asset loader.
  */
 class Stillframe_Plugin {
 
@@ -29,11 +29,27 @@ class Stillframe_Plugin {
 	private $assets;
 
 	/**
+	 * Media Library save handler.
+	 *
+	 * @var Stillframe_Media
+	 */
+	private $media;
+
+	/**
+	 * Tools submenu.
+	 *
+	 * @var Stillframe_Tools_Page
+	 */
+	private $tools;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		$this->menu   = new Stillframe_Admin_Bar_Menu();
 		$this->assets = new Stillframe_Asset_Loader();
+		$this->media  = new Stillframe_Media();
+		$this->tools  = new Stillframe_Tools_Page();
 	}
 
 	/**
@@ -43,6 +59,8 @@ class Stillframe_Plugin {
 	 */
 	public function init() {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
+		$this->media->register();
+		$this->tools->register();
 		add_action( 'admin_bar_menu', array( $this->menu, 'register' ), 100 );
 		add_action( 'wp_enqueue_scripts', array( $this->assets, 'enqueue' ) );
 		add_action( 'admin_enqueue_scripts', array( $this->assets, 'enqueue' ) );

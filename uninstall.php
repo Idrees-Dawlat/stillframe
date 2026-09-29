@@ -2,7 +2,8 @@
 /**
  * Uninstall Stillframe.
  *
- * Version 0.1.0 does not create options, tables, files, or uploads.
+ * Stillframe does not create options or tables.
+ * PNGs saved to the Media Library are normal attachments and are left in place.
  * This file intentionally does not delete site data.
  *
  * @package Stillframe
