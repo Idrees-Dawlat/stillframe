@@ -1816,6 +1816,22 @@
 		var size = element('div', { className: 'stillframe-snip__size' });
 		box.hidden = true;
 		size.hidden = true;
+		['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(function (dir) {
+			var handle = element('div', { className: 'stillframe-snip__handle' });
+			handle.setAttribute('data-h', dir);
+			box.appendChild(handle);
+		});
+		var actions = element('div', { className: 'stillframe-snip__actions', role: 'toolbar' });
+		var dims = element('span', { className: 'stillframe-snip__dims' });
+		var goButton = element('button', { type: 'button', className: 'stillframe-snip__go', text: text('capture') || 'Capture', title: (text('capture') || 'Capture') + ' (Enter)' });
+		var resetButton = element('button', { type: 'button', className: 'stillframe-snip__reset', text: text('cancel') || 'Cancel', title: (text('cancel') || 'Cancel') + ' (Esc)' });
+		actions.hidden = true;
+		actions.appendChild(dims);
+		actions.appendChild(goButton);
+		actions.appendChild(resetButton);
+		var sel = null;
+		var adj = null;
+		var adjFrame = 0;
 
 		var bar = element('div', { className: 'stillframe-snip__bar', role: 'toolbar', 'aria-label': text('heading') || 'Capture this screen' });
 		var hint = element('div', { className: 'stillframe-snip__hint', role: 'status' });
@@ -1837,6 +1853,8 @@
 		}
 
 		function setMode(next) {
+			sel = null;
+			adj = null;
 			mode = next;
 			root.setAttribute('data-mode', next);
 			rectButton.setAttribute('aria-pressed', next === 'rect' ? 'true' : 'false');
@@ -1895,6 +1913,7 @@
 		root.appendChild(shade);
 		root.appendChild(box);
 		root.appendChild(size);
+		root.appendChild(actions);
 		root.appendChild(bar);
 		root.appendChild(hint);
 		if (document.getElementById('wpadminbar')) {
@@ -1935,22 +1954,42 @@
 			}, delay);
 		}
 
+		function positionActions(rect) {
+			var width = actions.offsetWidth || 200;
+			var top = rect.y + rect.height + 10;
+			if (top > window.innerHeight - 52) {
+				top = Math.max(8, rect.y - 50);
+			}
+			var left = Math.min(Math.max(8, rect.x + rect.width - width), Math.max(8, window.innerWidth - width - 8));
+			actions.style.transform = 'translate3d(' + left + 'px,' + top + 'px,0)';
+		}
+
 		function showSelection(rect) {
 			if (!rect || rect.width < 1 || rect.height < 1) {
 				box.hidden = true;
 				size.hidden = true;
+				actions.hidden = true;
+				box.classList.remove('is-adjusting');
 				hint.hidden = false;
 				root.classList.remove('is-selecting');
 				return;
 			}
 			box.hidden = false;
-			size.hidden = false;
+			size.hidden = !!sel;
+			actions.hidden = !sel;
+			box.classList.toggle('is-adjusting', !!sel);
 			hint.hidden = true;
 			root.classList.add('is-selecting');
 			box.style.transform = 'translate3d(' + rect.x + 'px,' + rect.y + 'px,0)';
 			box.style.width = rect.width + 'px';
 			box.style.height = rect.height + 'px';
-			size.textContent = Math.round(rect.width) + ' × ' + Math.round(rect.height);
+			var label = Math.round(rect.width) + ' × ' + Math.round(rect.height);
+			if (sel) {
+				dims.textContent = label;
+				positionActions(rect);
+				return;
+			}
+			size.textContent = label;
 			var top = rect.y + rect.height + 10;
 			if (top > window.innerHeight - 32) {
 				top = Math.max(8, rect.y - 32);
@@ -2007,6 +2046,7 @@
 				captureRect(rectFromNode(pickWindow(event.clientX, event.clientY)));
 				return;
 			}
+			sel = null;
 			shade.setPointerCapture(event.pointerId);
 			drag = {
 				id: event.pointerId,
@@ -2057,8 +2097,110 @@
 				showSelection(null);
 				return;
 			}
-			captureRect(rect);
+			// Keep the selection so it can be moved or resized before capturing.
+			sel = rect;
+			showSelection(sel);
+			scheduleShot(IDLE_BEFORE_RENDER_MS);
 		});
+
+		function clearSelection() {
+			sel = null;
+			adj = null;
+			showSelection(null);
+		}
+
+		function applyAdjust(dx, dy) {
+			var o = adj.orig;
+			var view = viewSize();
+			var min = 8;
+			var l = o.x;
+			var t = o.y;
+			var r = o.x + o.width;
+			var b = o.y + o.height;
+			var dir = adj.dir;
+			if (dir === 'move') {
+				dx = Math.max(-l, Math.min(dx, view.width - r));
+				dy = Math.max(-t, Math.min(dy, view.height - b));
+				l += dx;
+				r += dx;
+				t += dy;
+				b += dy;
+			} else {
+				if (dir.indexOf('w') > -1) {
+					l = Math.max(0, Math.min(o.x + dx, r - min));
+				}
+				if (dir.indexOf('e') > -1) {
+					r = Math.min(view.width, Math.max(o.x + o.width + dx, l + min));
+				}
+				if (dir.indexOf('n') > -1) {
+					t = Math.max(0, Math.min(o.y + dy, b - min));
+				}
+				if (dir.indexOf('s') > -1) {
+					b = Math.min(view.height, Math.max(o.y + o.height + dy, t + min));
+				}
+			}
+			sel = { x: l, y: t, width: r - l, height: b - t };
+			showSelection(sel);
+		}
+
+		box.addEventListener('pointerdown', function (event) {
+			if (!sel || snipBusy || event.button !== 0) {
+				return;
+			}
+			touch();
+			event.preventDefault();
+			event.stopPropagation();
+			var handle = event.target && event.target.getAttribute ? event.target.getAttribute('data-h') : null;
+			box.setPointerCapture(event.pointerId);
+			adj = {
+				id: event.pointerId,
+				dir: handle || 'move',
+				x: event.clientX,
+				y: event.clientY,
+				orig: { x: sel.x, y: sel.y, width: sel.width, height: sel.height }
+			};
+		});
+		box.addEventListener('pointermove', function (event) {
+			if (!adj || adj.id !== event.pointerId) {
+				return;
+			}
+			touch();
+			moveEvent = event;
+			if (adjFrame) {
+				return;
+			}
+			adjFrame = window.requestAnimationFrame(function () {
+				adjFrame = 0;
+				if (adj && moveEvent) {
+					applyAdjust(moveEvent.clientX - adj.x, moveEvent.clientY - adj.y);
+				}
+			});
+		});
+		function endAdjust(event) {
+			if (adj && adj.id === event.pointerId) {
+				adj = null;
+				moveEvent = null;
+				scheduleShot(IDLE_BEFORE_RENDER_MS);
+			}
+		}
+		box.addEventListener('pointerup', endAdjust);
+		box.addEventListener('pointercancel', endAdjust);
+		box.addEventListener('dblclick', function () {
+			if (sel && !snipBusy) {
+				captureRect(sel);
+			}
+		});
+		goButton.addEventListener('click', function (event) {
+			stopBar(event);
+			if (sel && !snipBusy) {
+				captureRect(sel);
+			}
+		});
+		resetButton.addEventListener('click', function (event) {
+			stopBar(event);
+			clearSelection();
+		});
+		actions.addEventListener('pointerdown', stopBar);
 		shade.addEventListener('pointercancel', function (event) {
 			if (!drag || drag.id !== event.pointerId) {
 				return;
@@ -2069,11 +2211,24 @@
 		});
 
 		snipKeyHandler = function (event) {
-			if (!snip || event.key !== 'Escape') {
+			if (!snip) {
+				return;
+			}
+			if (event.key === 'Enter' && sel && !snipBusy) {
+				event.preventDefault();
+				event.stopPropagation();
+				captureRect(sel);
+				return;
+			}
+			if (event.key !== 'Escape') {
 				return;
 			}
 			event.preventDefault();
 			event.stopPropagation();
+			if (sel) {
+				clearSelection();
+				return;
+			}
 			cancelSnip();
 		};
 		document.addEventListener('keydown', snipKeyHandler, true);

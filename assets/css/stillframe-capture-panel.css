@@ -125,6 +125,95 @@
 	will-change: transform, width, height;
 }
 
+.stillframe-snip__box.is-adjusting {
+	pointer-events: auto;
+	cursor: move;
+}
+
+.stillframe-snip__handle {
+	position: absolute;
+	display: none;
+	width: 11px;
+	height: 11px;
+	background: #ffffff;
+	border: 2px solid var(--sf-brand);
+	border-radius: 50%;
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+	touch-action: none;
+}
+
+.stillframe-snip__handle::after {
+	content: "";
+	position: absolute;
+	inset: -9px;
+}
+
+.stillframe-snip__box.is-adjusting .stillframe-snip__handle {
+	display: block;
+}
+
+.stillframe-snip__handle[data-h="nw"] { left: 0; top: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+.stillframe-snip__handle[data-h="n"] { left: 50%; top: 0; transform: translate(-50%, -50%); cursor: ns-resize; }
+.stillframe-snip__handle[data-h="ne"] { left: 100%; top: 0; transform: translate(-50%, -50%); cursor: nesw-resize; }
+.stillframe-snip__handle[data-h="e"] { left: 100%; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+.stillframe-snip__handle[data-h="se"] { left: 100%; top: 100%; transform: translate(-50%, -50%); cursor: nwse-resize; }
+.stillframe-snip__handle[data-h="s"] { left: 50%; top: 100%; transform: translate(-50%, -50%); cursor: ns-resize; }
+.stillframe-snip__handle[data-h="sw"] { left: 0; top: 100%; transform: translate(-50%, -50%); cursor: nesw-resize; }
+.stillframe-snip__handle[data-h="w"] { left: 0; top: 50%; transform: translate(-50%, -50%); cursor: ew-resize; }
+
+.stillframe-snip__actions {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 5px 5px 12px;
+	background: var(--sf-surface);
+	border: 1px solid var(--sf-line);
+	border-radius: 10px;
+	box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22), 0 1px 2px rgba(15, 23, 42, 0.1);
+	will-change: transform;
+}
+
+.stillframe-snip__dims {
+	margin-right: 4px;
+	color: var(--sf-muted);
+	font-size: 12px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.stillframe-snip__actions button {
+	height: 32px;
+	padding: 0 14px;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	border: 1px solid transparent;
+	border-radius: 8px;
+}
+
+.stillframe-snip__go {
+	color: #ffffff;
+	background: var(--sf-brand);
+}
+
+.stillframe-snip__go:hover {
+	background: var(--sf-brand-hover);
+}
+
+.stillframe-snip__reset {
+	color: var(--sf-text-2);
+	background: transparent;
+}
+
+.stillframe-snip__reset:hover {
+	background: var(--sf-well);
+}
+
 .stillframe-snip__size {
 	position: fixed;
 	top: 0;

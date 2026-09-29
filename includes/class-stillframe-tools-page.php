@@ -51,6 +51,8 @@ class Stillframe_Tools_Page {
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Stillframe', 'stillframe' ) . '</h1>';
 		echo '<p>' . esc_html__( 'Click Capture, then drag. Esc cancels.', 'stillframe' ) . '</p>';
+		echo '<p><span class="dashicons dashicons-camera" aria-hidden="true"></span> ' . esc_html__( 'You can also start a capture from any screen with the camera icon at the top right of the admin bar.', 'stillframe' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'After you drag, move or resize the selection, then press Enter or choose Capture.', 'stillframe' ) . '</p>';
 		echo '<p><button type="button" class="button button-primary" id="stillframe-tools-capture">';
 		echo esc_html__( 'Capture this screen', 'stillframe' );
 		echo '</button></p>';

@@ -14,7 +14,7 @@ Drag a region of the screen you are looking at, mark it up, then download a PNG 
 
 Plugin and theme authors need a picture of the screen they are already looking at. Stillframe adds a camera icon in the top bar and a Stillframe page under Tools.
 
-Drag a region, or capture the full view. Phone, iPad, and Desktop are under Widths and reload the page at 390, 834, or 1440 pixels. You can include the top bar and the side menu, or hide other plugins so the shot looks like a fresh WordPress install. Draw on the picture, then download a PNG or save it to the Media Library.
+Drag a region, then move or resize it before you capture, or capture the full view. Phone, iPad, and Desktop are under Widths and reload the page at 390, 834, or 1440 pixels. You can include the top bar and the side menu, or hide other plugins so the shot looks like a fresh WordPress install. Draw on the picture, then download a PNG or save it to the Media Library.
 
 Export scale is 1x, 2x, or 3x. The default scale is 1x.
 
@@ -58,6 +58,8 @@ Stillframe bundles modern-screenshot 4.7.0 (MIT license) as `assets/js/vendor/mo
 == Changelog ==
 
 = 0.1.7 =
+* New: after dragging, move or resize the selection with handles, then press Enter or choose Capture
+* Fixed garbled text in captures when a plugin uses an image as CSS content
 * Fixed the area selection stuttering when the capture toolbar first opens: the background page render now waits until the pointer is idle and is skipped on very heavy pages
 * Readme, translation and code-standards cleanup for the WordPress.org review
 
