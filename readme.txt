@@ -3,7 +3,7 @@ Contributors: grafucci
 Tags: screenshot, capture, annotation, png, design
 Requires at least: 6.4
 Tested up to: 7.1.2
-Stable tag: 0.1.2
+Stable tag: 0.1.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -57,6 +57,10 @@ Tools, then Stillframe, starts a capture. Width, scale, the top bar, the side me
 This version does not ship screenshot images.
 
 == Changelog ==
+
+= 0.1.3 =
+* Match the capture overlay to the Windows snipping toolbar
+* Keep drag selection smooth by capturing only after you release
 
 = 0.1.2 =
 * remove the orange outline on the top bar capture control

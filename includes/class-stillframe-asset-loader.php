@@ -288,18 +288,17 @@ class Stillframe_Asset_Loader {
 			'invalidWidth'    => esc_html__( 'Enter a whole number from 320 to 2560. The page was not changed.', 'stillframe' ),
 			'downloadFailed'  => esc_html__( 'The download failed. The page was not changed.', 'stillframe' ),
 			'libraryMissing'  => esc_html__( 'The capture tool did not load. The page was not changed.', 'stillframe' ),
-			'snipHint'        => esc_html__( 'Drag to select an area', 'stillframe' ),
-			'snipFull'        => esc_html__( 'Full view', 'stillframe' ),
+			'snipHint'        => esc_html__( 'Drag to select', 'stillframe' ),
+			'snipRect'        => esc_html__( 'Rectangular snip', 'stillframe' ),
+			'snipFree'        => esc_html__( 'Freeform snip', 'stillframe' ),
+			'snipWindow'      => esc_html__( 'Window snip', 'stillframe' ),
+			'snipFull'        => esc_html__( 'Fullscreen', 'stillframe' ),
 			'topBar'          => esc_html__( 'Top bar', 'stillframe' ),
 			'sideMenu'        => esc_html__( 'Side menu', 'stillframe' ),
-			'plugins'         => esc_html__( 'Plugins', 'stillframe' ),
-			'pluginsAll'      => esc_html__( 'Everything', 'stillframe' ),
-			'pluginsClean'    => esc_html__( 'Clean WordPress', 'stillframe' ),
-			'pluginsChoose'   => esc_html__( 'Choose', 'stillframe' ),
-			'pluginsHelp'     => esc_html__( 'Clean WordPress hides other plugin menus, notices, and extra dashboard boxes.', 'stillframe' ),
+			'pluginsClean'    => esc_html__( 'Hide other plugins', 'stillframe' ),
 			'notices'         => esc_html__( 'Admin notices', 'stillframe' ),
 			'cancel'          => esc_html__( 'Cancel', 'stillframe' ),
-			'widths'          => esc_html__( 'Widths', 'stillframe' ),
+			'more'            => esc_html__( 'More', 'stillframe' ),
 			'topBarHelp'      => esc_html__( 'Include the top bar', 'stillframe' ),
 			'sideMenuHelp'    => esc_html__( 'Include the side menu', 'stillframe' ),
 		);
@@ -311,7 +310,7 @@ class Stillframe_Asset_Loader {
 	 * @return string
 	 */
 	private function admin_bar_css() {
-		return '#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:hover,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:focus{outline:none;box-shadow:none;border:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon{margin-right:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon:before{content:"\f306";top:2px;}#wpadminbar #wp-admin-bar-stillframe-capture .screen-reader-text{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}';
+		return '#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:hover,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:focus{outline:none;box-shadow:none;border:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon{margin-right:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon:before{content:"\\f306";top:2px;}#wpadminbar #wp-admin-bar-stillframe-capture .screen-reader-text{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}.stillframe-snip{position:fixed;inset:0;z-index:1000000;margin:0}.stillframe-snip__shade{position:absolute;inset:0;cursor:crosshair;background:rgba(0,0,0,.55)}.stillframe-snip__bar{position:fixed;top:12px;left:50%;z-index:6;display:flex;align-items:center;padding:4px;background:#2b2b2b;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);transform:translateX(-50%)}.stillframe-snip.has-admin-bar .stillframe-snip__bar{top:44px}.stillframe-snip__bar button{width:40px;height:40px;margin:0;padding:0;color:#f3f3f3;background:transparent;border:0;border-radius:6px}.stillframe-snip__bar button[aria-pressed="true"]{background:#3f3f3f;box-shadow:inset 0 0 0 1px #9cd1e8}.stillframe-snip__sep{width:1px;height:22px;margin:0 6px;background:#555}';
 	}
 
 	/**

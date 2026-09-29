@@ -50,8 +50,7 @@ class Stillframe_Tools_Page {
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Stillframe', 'stillframe' ) . '</h1>';
-		echo '<p>' . esc_html__( 'Drag a region of the screen, like the Windows snipping tool. Then download a PNG or save it to the Media Library.', 'stillframe' ) . '</p>';
-		echo '<p>' . esc_html__( 'The camera icon in the top bar starts a capture on any screen. After it opens, you can include the top bar, the side menu, and choose which plugins stay visible.', 'stillframe' ) . '</p>';
+		echo '<p>' . esc_html__( 'Click Capture, then drag. Esc cancels.', 'stillframe' ) . '</p>';
 		echo '<p><button type="button" class="button button-primary" id="stillframe-tools-capture">';
 		echo esc_html__( 'Capture this screen', 'stillframe' );
 		echo '</button></p>';

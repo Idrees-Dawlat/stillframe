@@ -30,8 +30,13 @@
 	var snip = null;
 	var snipKeyHandler = null;
 	var sceneRestore = null;
-	var pluginPopover = null;
-	var widthPopover = null;
+	var morePopover = null;
+	var compactPanel = false;
+	var viewShot = {
+		id: 0,
+		canvas: null,
+		work: null
+	};
 
 	function text(key) {
 		var value = config.i18n && config.i18n[key] ? String(config.i18n[key]) : '';
@@ -199,20 +204,43 @@
 	}
 
 	function readScale() {
-		if (panel) {
-			var pressed = panel.querySelector('.stillframe-scale-choice[aria-pressed="true"]');
-			if (pressed) {
-				var fromPanel = parseInt(pressed.getAttribute('data-scale'), 10);
-				if (fromPanel === 1 || fromPanel === 2 || fromPanel === 3) {
-					return fromPanel;
-				}
+		return 1;
+	}
+
+	function viewSize() {
+		return {
+			width: Math.max(1, Math.round(document.documentElement.clientWidth || window.innerWidth || 1)),
+			height: Math.max(1, Math.round(document.documentElement.clientHeight || window.innerHeight || 1))
+		};
+	}
+
+	function invalidateViewShot() {
+		viewShot.id += 1;
+		viewShot.canvas = null;
+		viewShot.work = null;
+	}
+
+	function startViewShot() {
+		var id = ++viewShot.id;
+		viewShot.canvas = null;
+		var size = viewSize();
+		viewShot.work = renderCanvas(document.documentElement, 1, {
+			width: size.width,
+			height: size.height
+		}, window).then(function (canvas) {
+			if (id !== viewShot.id) {
+				return null;
 			}
-		}
-		var scale = readPrefs().scale;
-		if (scale !== 1 && scale !== 2 && scale !== 3) {
-			return 1;
-		}
-		return scale;
+			viewShot.canvas = canvas;
+			return canvas;
+		}).catch(function (error) {
+			if (id !== viewShot.id) {
+				return null;
+			}
+			viewShot.work = null;
+			throw error;
+		});
+		return viewShot.work;
 	}
 
 	function readWidth() {
@@ -329,6 +357,31 @@
 		revealExports();
 	}
 
+	function loadImage(blob) {
+		return new Promise(function (resolve, reject) {
+			if (objectUrl) {
+				URL.revokeObjectURL(objectUrl);
+				objectUrl = '';
+			}
+			objectUrl = URL.createObjectURL(blob);
+			var image = new Image();
+			image.alt = text('capturedAlt');
+			image.draggable = false;
+			image.style.width = '100%';
+			image.style.maxWidth = '100%';
+			image.style.height = 'auto';
+			image.onload = function () {
+				resolve(image);
+			};
+			image.onerror = function () {
+				var failed = new Error('failed');
+				failed.code = 'failed';
+				reject(failed);
+			};
+			image.src = objectUrl;
+		});
+	}
+
 	function showImage(blob, width, scale, sourceUrl) {
 		if (objectUrl) {
 			URL.revokeObjectURL(objectUrl);
@@ -352,9 +405,11 @@
 			}
 			mountEditor(image);
 			setBusy(false);
-			setStatus(formatCaptured(width, scale));
-			if (penButton) {
-				penButton.focus();
+			if (!compactPanel) {
+				setStatus(formatCaptured(width, scale));
+			}
+			if (downloadButton) {
+				downloadButton.focus();
 			}
 		};
 		image.onerror = function () {
@@ -448,7 +503,7 @@
 			ready = Promise.resolve();
 		}
 		var limit = new Promise(function (resolve) {
-			window.setTimeout(resolve, 1200);
+			window.setTimeout(resolve, 400);
 		});
 		return Promise.race([ready, limit]).then(function () {
 			return nextFrames(1);
@@ -852,13 +907,6 @@
 		};
 	}
 
-	function hideSnip() {
-		if (!snip) {
-			return;
-		}
-		snip.style.display = 'none';
-	}
-
 	function destroySnip() {
 		if (snipKeyHandler) {
 			document.removeEventListener('keydown', snipKeyHandler, true);
@@ -868,13 +916,17 @@
 			snip.parentNode.removeChild(snip);
 		}
 		snip = null;
-		pluginPopover = null;
-		widthPopover = null;
+		morePopover = null;
+		var boot = document.getElementById('stillframe-snip-boot');
+		if (boot && boot.parentNode) {
+			boot.parentNode.removeChild(boot);
+		}
 	}
 
 	function cancelSnip() {
 		session += 1;
 		snipBusy = false;
+		invalidateViewShot();
 		leaveScene();
 		destroySnip();
 		focusMenu();
@@ -920,7 +972,7 @@
 		});
 	}
 
-	function cropCanvasToBlob(canvas, rect, scale) {
+	function cropCanvasSync(canvas, rect, scale) {
 		var sx = Math.max(0, Math.round(rect.x * scale));
 		var sy = Math.max(0, Math.round(rect.y * scale));
 		var sw = Math.max(1, Math.round(rect.width * scale));
@@ -928,7 +980,7 @@
 		if (sx >= canvas.width || sy >= canvas.height) {
 			var outside = new Error('failed');
 			outside.code = 'failed';
-			return Promise.reject(outside);
+			throw outside;
 		}
 		if (sx + sw > canvas.width) {
 			sw = canvas.width - sx;
@@ -943,62 +995,48 @@
 		if (!ctx) {
 			var failed = new Error('failed');
 			failed.code = 'failed';
-			return Promise.reject(failed);
+			throw failed;
 		}
 		ctx.imageSmoothingEnabled = false;
 		ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-		return canvasToBlob(out);
+		return out;
 	}
 
-	function prepareClone(root, view, shiftScroll) {
+	function cropCanvasToBlob(canvas, rect, scale) {
+		try {
+			return canvasToBlob(cropCanvasSync(canvas, rect, scale));
+		} catch (error) {
+			return Promise.reject(error);
+		}
+	}
+
+	function prepareClone(root, view, crop) {
 		if (!root || root.nodeType !== 1) {
 			return;
 		}
 		var doc = view.document;
-		var bar = doc.getElementById('wpadminbar');
-		var barVisible = false;
-		if (bar) {
-			var barStyle = view.getComputedStyle(bar);
-			barVisible = barStyle.display !== 'none' && barStyle.visibility !== 'hidden';
-		}
-		var barHeight = barVisible ? Math.round(bar.getBoundingClientRect().height) : 0;
-		if (root.nodeName === 'HTML') {
-			root.style.setProperty('margin-top', barHeight + 'px', 'important');
-		}
-		if (!shiftScroll) {
+		var sx = (view.scrollX || doc.documentElement.scrollLeft || 0) + (crop ? crop.x : 0);
+		var sy = (view.scrollY || doc.documentElement.scrollTop || 0) + (crop ? crop.y : 0);
+		if (!sx && !sy) {
 			return;
 		}
 		root.style.setProperty('overflow', 'hidden', 'important');
-		var sx = view.scrollX || doc.documentElement.scrollLeft || 0;
-		var sy = view.scrollY || doc.documentElement.scrollTop || 0;
 		var body = root.querySelector('body');
-		if (!body || (!sx && !sy)) {
+		if (!body) {
 			return;
 		}
 		body.style.setProperty('transform', 'translate(' + (-sx) + 'px,' + (-sy) + 'px)', 'important');
 		body.style.setProperty('transform-origin', '0 0', 'important');
-		var nodes = root.querySelectorAll('*');
-		for (var i = 0; i < nodes.length; i++) {
-			var id = nodes[i].id;
-			var fixed = nodes[i].style.position === 'fixed' || id === 'wpadminbar' || id === 'adminmenuwrap' || id === 'adminmenuback';
-			if (!fixed) {
-				continue;
+		['wpadminbar', 'adminmenuwrap', 'adminmenuback'].forEach(function (id) {
+			var node = root.querySelector('#' + id);
+			if (!node) {
+				return;
 			}
-			var prev = nodes[i].style.transform;
-			var shift = 'translate(' + sx + 'px,' + sy + 'px)';
-			if (prev && prev !== 'none') {
-				nodes[i].style.setProperty('transform', shift + ' ' + prev, 'important');
-			} else {
-				nodes[i].style.setProperty('transform', shift, 'important');
-			}
-		}
+			node.style.setProperty('transform', 'translate(' + sx + 'px,' + sy + 'px)', 'important');
+		});
 	}
 
-	function makeFilter(view, fullPage) {
-		var doc = view.document;
-		var right = doc.documentElement.clientWidth || view.innerWidth || 0;
-		var bottom = doc.documentElement.clientHeight || view.innerHeight || 0;
-		var pad = 48;
+	function makeFilter(view, crop) {
 		return function (nodeToKeep) {
 			if (!nodeToKeep || nodeToKeep.nodeType !== 1) {
 				return true;
@@ -1007,20 +1045,18 @@
 			if (tag === 'SCRIPT' || tag === 'NOSCRIPT') {
 				return false;
 			}
-			if (nodeToKeep.getAttribute && nodeToKeep.getAttribute('data-stillframe-hidden') === '1') {
-				return false;
-			}
 			if (nodeToKeep.classList && (
 				nodeToKeep.classList.contains('stillframe-snip') ||
+				nodeToKeep.classList.contains('stillframe-result') ||
 				nodeToKeep.classList.contains('stillframe-capture-panel') ||
 				nodeToKeep.classList.contains('stillframe-capture-frame')
 			)) {
 				return false;
 			}
-			if (tag === 'HTML' || tag === 'BODY' || tag === 'HEAD' || tag === 'STYLE' || tag === 'LINK' || tag === 'META' || tag === 'TITLE') {
+			if (!crop) {
 				return true;
 			}
-			if (fullPage) {
+			if (tag === 'HTML' || tag === 'BODY' || tag === 'HEAD' || tag === 'STYLE' || tag === 'LINK' || tag === 'META' || tag === 'TITLE') {
 				return true;
 			}
 			var rect;
@@ -1029,52 +1065,40 @@
 			} catch (error) {
 				return true;
 			}
-			if (rect.bottom >= -pad && rect.top <= bottom + pad && rect.right >= -pad && rect.left <= right + pad) {
+			if (rect.width < 1 && rect.height < 1) {
 				return true;
 			}
-			if (tag === 'SVG' && nodeToKeep.querySelector && nodeToKeep.querySelector('symbol')) {
-				return true;
+			if (rect.bottom < crop.y || rect.top > crop.y + crop.height || rect.right < crop.x || rect.left > crop.x + crop.width) {
+				return false;
 			}
-			if (rect.width < 1 && rect.height < 1 && nodeToKeep.childElementCount) {
-				try {
-					var computed = view.getComputedStyle(nodeToKeep);
-					if (computed.display === 'none' || computed.visibility === 'hidden') {
-						return false;
-					}
-				} catch (error) {
-					return true;
-				}
-				return true;
-			}
-			return false;
+			return true;
 		};
 	}
 
-	function shoot(node, scale, bounds, view) {
+	function renderCanvas(node, scale, bounds, view) {
 		view = view || window;
 		if (!window.modernScreenshot || typeof window.modernScreenshot.domToCanvas !== 'function') {
 			var missing = new Error('library');
 			missing.code = 'library';
 			return Promise.reject(missing);
 		}
-		var fullPage = !!(bounds && bounds.fullPage);
+		var crop = bounds && bounds.crop ? bounds.crop : null;
 		try {
 			var options = {
 				scale: scale,
 				backgroundColor: '#ffffff',
 				maximumCanvasSize: 0,
-				timeout: fullPage ? 12000 : 5000,
-				font: {
-					preferredFormat: 'woff2'
-				},
+				timeout: 250,
+				font: false,
 				features: {
 					restoreScrollPosition: false,
-					copyScrollbar: false
+					copyScrollbar: false,
+					fixSvgXmlDecode: false
 				},
-				filter: makeFilter(view, fullPage),
+				filter: makeFilter(view, crop),
 				onCloneNode: function (cloned) {
 					try {
-						prepareClone(cloned, view, !fullPage);
+						prepareClone(cloned, view, crop);
 					} catch (cloneError) {
 						return;
 					}
@@ -1084,18 +1108,22 @@
 				options.width = bounds.width;
 				options.height = bounds.height;
 			}
-			return window.modernScreenshot.domToCanvas(node, options).then(function (canvas) {
-				if (bounds && bounds.crop) {
-					return cropCanvasToBlob(canvas, bounds.crop, scale);
-				}
-				return canvasToBlob(canvas);
-			});
+			return window.modernScreenshot.domToCanvas(node, options);
 		} catch (error) {
 			if (error && !error.code) {
 				error.code = 'failed';
 			}
 			return Promise.reject(error);
 		}
+	}
+
+	function shoot(node, scale, bounds, view) {
+		return renderCanvas(node, scale, bounds, view).then(function (canvas) {
+			if (bounds && bounds.crop) {
+				return cropCanvasToBlob(canvas, bounds.crop, scale);
+			}
+			return canvasToBlob(canvas);
+		});
 	}
 
 	function prepareAndShoot(local, scale) {
@@ -1144,6 +1172,13 @@
 		});
 	}
 
+	function failSnip() {
+		snipBusy = false;
+		if (snip) {
+			snip.style.visibility = '';
+		}
+	}
+
 	function captureRect(rect) {
 		rect = clampRect(rect);
 		if (snipBusy || rect.width < 8 || rect.height < 8) {
@@ -1151,368 +1186,634 @@
 		}
 		snipBusy = true;
 		var token = session;
-		var scale = readScale();
-		hideSnip();
-		removeFrame();
-		var viewW = document.documentElement.clientWidth || window.innerWidth || 1;
-		var viewH = document.documentElement.clientHeight || window.innerHeight || 1;
-		shoot(document.documentElement, scale, {
-			width: viewW,
-			height: viewH,
-			crop: rect
-		}, window).then(function (blob) {
-			snipBusy = false;
+		if (snip) {
+			snip.style.visibility = 'hidden';
+		}
+		window.requestAnimationFrame(function () {
 			if (token !== session) {
 				return;
 			}
-			leaveScene();
-			destroySnip();
-			api.openPanel(returnFocus);
-			if (!panel) {
-				return;
-			}
-			showImage(blob, Math.round(rect.width), scale, window.location.href);
-		}).catch(function (error) {
-			snipBusy = false;
-			if (token !== session) {
-				return;
-			}
-			leaveScene();
-			destroySnip();
-			api.openPanel(returnFocus);
-			reportFailure(error);
+			renderCanvas(document.documentElement, 1, {
+				width: Math.max(1, Math.round(rect.width)),
+				height: Math.max(1, Math.round(rect.height)),
+				crop: rect
+			}, window).then(function (canvas) {
+				if (token !== session || !canvas) {
+					return null;
+				}
+				return canvasToBlob(canvas);
+			}).then(function (blob) {
+				if (token !== session || !blob) {
+					return;
+				}
+				if (objectUrl) {
+					URL.revokeObjectURL(objectUrl);
+					objectUrl = '';
+				}
+				objectUrl = URL.createObjectURL(blob);
+				var image = new Image();
+				image.alt = text('capturedAlt');
+				image.draggable = false;
+				image.onload = function () {
+					if (token !== session) {
+						return;
+					}
+					snipBusy = false;
+					openResult(image, rect);
+					destroySnip();
+				};
+				image.onerror = function () {
+					failSnip();
+				};
+				image.src = objectUrl;
+			}).catch(function () {
+				if (token !== session) {
+					return;
+				}
+				failSnip();
+			});
 		});
 	}
 
-	function beginDevice(width) {
-		var parsed = parseInt(width, 10);
-		if (!parsed) {
-			return;
-		}
-		leaveScene();
-		destroySnip();
-		api.openPanel(returnFocus);
-		startCapture('frame', parsed);
+	function bindDownload(button) {
+		button.addEventListener('click', function () {
+			if (!editor || !captured) {
+				return;
+			}
+			button.disabled = true;
+			setStatus(text('preparing'));
+			editor.flatten().then(function (blob) {
+				saveBlob(blob, fileNameFor(captured.url, captured.width, captured.scale));
+				button.disabled = false;
+				setStatus('');
+			}).catch(function () {
+				button.disabled = false;
+				setStatus(text('downloadFailed'));
+			});
+		});
 	}
 
-	function closePopovers() {
-		if (pluginPopover) {
-			pluginPopover.hidden = true;
+	function openResult(image, rect) {
+		if (editor) {
+			editor.destroy();
+			editor = null;
 		}
-		if (widthPopover) {
-			widthPopover.hidden = true;
+		if (keyHandler) {
+			document.removeEventListener('keydown', keyHandler, true);
+			keyHandler = null;
+		}
+		if (panel && panel.parentNode) {
+			panel.parentNode.removeChild(panel);
+		}
+
+		compactPanel = true;
+		captured = {
+			width: Math.max(1, Math.round(rect.width)),
+			scale: 1,
+			url: window.location.href
+		};
+
+		var root = element('div', {
+			className: 'stillframe-result',
+			role: 'dialog',
+			'aria-modal': 'true',
+			'aria-labelledby': 'stillframe-capture-heading'
+		});
+		var win = element('div', { className: 'stillframe-result__window' });
+		var heading = element('h2', {
+			id: 'stillframe-capture-heading',
+			className: 'stillframe-sr',
+			text: text('heading')
+		});
+		var toolbar = element('div', { className: 'stillframe-result__toolbar' });
+		var saveGroup = element('div', { className: 'stillframe-result__group' });
+		var markGroup = element('div', {
+			className: 'stillframe-result__group',
+			role: 'group',
+			'aria-label': text('tools')
+		});
+
+		downloadButton = element('button', {
+			type: 'button',
+			className: 'stillframe-btn stillframe-btn-primary',
+			text: text('download')
+		});
+		bindDownload(downloadButton);
+
+		mediaButton = element('button', {
+			type: 'button',
+			className: 'stillframe-btn',
+			text: text('saveMedia')
+		});
+		mediaButton.addEventListener('click', saveToMedia);
+		if (!config.canUpload) {
+			mediaButton.hidden = true;
+		}
+
+		saveGroup.appendChild(downloadButton);
+		saveGroup.appendChild(mediaButton);
+
+		function addTool(name, label, pressed) {
+			var button = element('button', {
+				type: 'button',
+				className: 'stillframe-btn stillframe-tool',
+				text: label
+			});
+			button.setAttribute('data-tool', name);
+			button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+			button.addEventListener('click', function () {
+				Array.prototype.forEach.call(markGroup.querySelectorAll('.stillframe-tool'), function (item) {
+					item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+				});
+				if (editor) {
+					editor.setTool(name);
+				}
+			});
+			markGroup.appendChild(button);
+			return button;
+		}
+
+		penButton = addTool('pen', text('pen'), true);
+		addTool('circle', text('circle'), false);
+		addTool('arrow', text('arrow'), false);
+		undoButton = element('button', {
+			type: 'button',
+			className: 'stillframe-btn',
+			text: text('undo')
+		});
+		undoButton.disabled = true;
+		undoButton.addEventListener('click', function () {
+			if (editor) {
+				editor.undo();
+			}
+		});
+		clearButton = element('button', {
+			type: 'button',
+			className: 'stillframe-btn',
+			text: text('clear')
+		});
+		clearButton.disabled = true;
+		clearButton.addEventListener('click', function () {
+			if (editor) {
+				editor.clear();
+			}
+		});
+		markGroup.appendChild(undoButton);
+		markGroup.appendChild(clearButton);
+
+		var closeButton = element('button', {
+			type: 'button',
+			className: 'stillframe-btn stillframe-result__close',
+			text: '\u00d7',
+			'aria-label': text('close')
+		});
+		closeButton.addEventListener('click', function () {
+			api.closePanel();
+		});
+
+		toolbar.appendChild(saveGroup);
+		toolbar.appendChild(markGroup);
+		toolbar.appendChild(closeButton);
+
+		statusNode = element('p', {
+			className: 'stillframe-result__status',
+			role: 'status'
+		});
+
+		var stage = element('div', { className: 'stillframe-result__stage' });
+		canvasWrap = element('div', { className: 'stillframe-capture-panel__canvas-wrap' });
+		stage.appendChild(canvasWrap);
+		editorSection = stage;
+
+		win.appendChild(heading);
+		win.appendChild(toolbar);
+		win.appendChild(stage);
+		win.appendChild(statusNode);
+		root.appendChild(win);
+
+		panel = root;
+		dialog = win;
+		keyHandler = function (event) {
+			if (event.key !== 'Escape') {
+				return;
+			}
+			event.preventDefault();
+			event.stopPropagation();
+			api.closePanel();
+		};
+		document.addEventListener('keydown', keyHandler, true);
+		document.body.appendChild(root);
+		mountEditor(image);
+		setBusy(false);
+		if (downloadButton) {
+			downloadButton.focus();
 		}
 	}
 
-	function pluginsLabel(mode) {
-		if (mode === 'hide') {
-			return text('pluginsClean') || 'Clean WordPress';
+	function svgNode(name, attrs) {
+		var node = document.createElementNS('http://www.w3.org/2000/svg', name);
+		if (attrs) {
+			Object.keys(attrs).forEach(function (key) {
+				node.setAttribute(key, attrs[key]);
+			});
 		}
-		if (mode === 'choose') {
-			return text('pluginsChoose') || 'Choose';
-		}
-		return text('pluginsAll') || 'Everything';
+		return node;
+	}
+
+	function iconButton(label, draw) {
+		var button = element('button', {
+			type: 'button',
+			'aria-label': label,
+			title: label
+		});
+		var svg = svgNode('svg', {
+			viewBox: '0 0 24 24',
+			width: '20',
+			height: '20',
+			'aria-hidden': 'true',
+			focusable: 'false'
+		});
+		draw(svg);
+		button.appendChild(svg);
+		return button;
 	}
 
 	function openSnip() {
 		if (snip) {
 			return;
 		}
-		var prefs = readPrefs();
-		var entries = collectEntries(document);
+		var boot = document.getElementById('stillframe-snip-boot');
+		if (boot && boot.parentNode) {
+			boot.parentNode.removeChild(boot);
+		}
 		var root = element('div', {
 			className: 'stillframe-snip',
 			role: 'dialog',
 			'aria-modal': 'true',
 			'aria-label': text('heading') || 'Capture this screen'
 		});
+		root.setAttribute('data-mode', 'rect');
+		var dimT = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--t' });
+		var dimL = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--l' });
+		var dimR = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--r' });
+		var dimB = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--b' });
 		var shade = element('div', { className: 'stillframe-snip__shade' });
-		var hint = element('div', {
-			className: 'stillframe-snip__hint',
-			text: text('snipHint') || 'Drag to select an area'
-		});
 		var box = element('div', { className: 'stillframe-snip__box' });
 		var size = element('div', { className: 'stillframe-snip__size' });
+		var pathSvg = svgNode('svg', {
+			class: 'stillframe-snip__path',
+			'aria-hidden': 'true'
+		});
+		var pathLine = svgNode('polyline', {
+			fill: 'rgba(255,255,255,0.06)',
+			stroke: '#ffffff',
+			'stroke-width': '2',
+			'stroke-linejoin': 'round',
+			'stroke-linecap': 'round'
+		});
+		pathSvg.appendChild(pathLine);
 		box.hidden = true;
 		size.hidden = true;
+		pathSvg.hidden = true;
+
 		var bar = element('div', { className: 'stillframe-snip__bar' });
+		var mode = 'rect';
+		var rectButton = iconButton(text('snipRect') || 'Rectangular snip', function (svg) {
+			svg.appendChild(svgNode('rect', {
+				x: '4',
+				y: '6',
+				width: '16',
+				height: '12',
+				rx: '2',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '1.8'
+			}));
+		});
+		var freeButton = iconButton(text('snipFree') || 'Freeform snip', function (svg) {
+			svg.appendChild(svgNode('path', {
+				d: 'M4 17c2.2-7 3.2-1.5 5.4-6.2 1.6-3.4 2.4 4.8 4.6 1.6 1.8-2.6 2.6-5.4 6-3.2',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '1.8',
+				'stroke-linecap': 'round'
+			}));
+		});
+		var windowModeButton = iconButton(text('snipWindow') || 'Window snip', function (svg) {
+			svg.appendChild(svgNode('rect', {
+				x: '3',
+				y: '5',
+				width: '12',
+				height: '9',
+				rx: '1.5',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '1.8'
+			}));
+			svg.appendChild(svgNode('rect', {
+				x: '8',
+				y: '10',
+				width: '12',
+				height: '9',
+				rx: '1.5',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '1.8'
+			}));
+		});
+		var fullButton = iconButton(text('snipFull') || 'Fullscreen', function (svg) {
+			svg.appendChild(svgNode('path', {
+				d: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '1.8',
+				'stroke-linecap': 'round'
+			}));
+		});
+		var sep = element('span', { className: 'stillframe-snip__sep' });
+		sep.setAttribute('aria-hidden', 'true');
+		var cancelButton = iconButton(text('cancel') || 'Close', function (svg) {
+			svg.appendChild(svgNode('path', {
+				d: 'M6 6l12 12M18 6L6 18',
+				fill: 'none',
+				stroke: 'currentColor',
+				'stroke-width': '1.8',
+				'stroke-linecap': 'round'
+			}));
+		});
 
-		function pressedButton(label, help, isOn) {
-			var button = element('button', { type: 'button', text: label, title: help });
-			button.setAttribute('aria-pressed', isOn ? 'true' : 'false');
-			return button;
+		function setMode(next) {
+			mode = next;
+			root.setAttribute('data-mode', next);
+			rectButton.setAttribute('aria-pressed', next === 'rect' ? 'true' : 'false');
+			freeButton.setAttribute('aria-pressed', next === 'freeform' ? 'true' : 'false');
+			windowModeButton.setAttribute('aria-pressed', next === 'window' ? 'true' : 'false');
+			fullButton.setAttribute('aria-pressed', 'false');
+			showSelection(null);
+			pathSvg.hidden = true;
+			pathLine.setAttribute('points', '');
 		}
 
-		var topButton = pressedButton(text('topBar') || 'Top bar', text('topBarHelp') || 'Include the top bar', prefs.adminBar);
-		var sideButton = pressedButton(text('sideMenu') || 'Side menu', text('sideMenuHelp') || 'Include the side menu', prefs.adminMenu);
-		if (!document.getElementById('wpadminbar')) {
-			topButton.hidden = true;
-		}
-		if (!document.getElementById('adminmenuwrap')) {
-			sideButton.hidden = true;
-		}
-		topButton.addEventListener('click', function () {
-			var next = readPrefs();
-			next.adminBar = topButton.getAttribute('aria-pressed') !== 'true';
-			savePrefs(next);
-			topButton.setAttribute('aria-pressed', next.adminBar ? 'true' : 'false');
-			syncScene();
-		});
-		sideButton.addEventListener('click', function () {
-			var next = readPrefs();
-			next.adminMenu = sideButton.getAttribute('aria-pressed') !== 'true';
-			savePrefs(next);
-			sideButton.setAttribute('aria-pressed', next.adminMenu ? 'true' : 'false');
-			syncScene();
-		});
-
-		var pluginsWrap = element('div', { className: 'stillframe-snip__popwrap' });
-		var pluginsButton = element('button', {
-			type: 'button',
-			className: 'stillframe-snip__menu',
-			text: pluginsLabel(prefs.plugins),
-			title: text('plugins') || 'Plugins'
-		});
-		pluginsButton.setAttribute('aria-expanded', 'false');
-		pluginPopover = element('div', { className: 'stillframe-snip__popover' });
-		pluginPopover.hidden = true;
-		var pluginHelp = element('p', {
-			className: 'stillframe-snip__help',
-			text: text('pluginsHelp') || 'Clean WordPress hides other plugin menus, notices, and extra dashboard boxes.'
-		});
-		var modeRow = element('div', { className: 'stillframe-snip__modes' });
-		var modeButtons = [];
-		[
-			['all', text('pluginsAll') || 'Everything'],
-			['hide', text('pluginsClean') || 'Clean WordPress'],
-			['choose', text('pluginsChoose') || 'Choose']
-		].forEach(function (item) {
-			var button = element('button', { type: 'button', text: item[1] });
-			button.setAttribute('data-mode', item[0]);
-			button.setAttribute('aria-pressed', prefs.plugins === item[0] ? 'true' : 'false');
-			button.addEventListener('click', function () {
-				var next = readPrefs();
-				next.plugins = item[0];
-				savePrefs(next);
-				refreshPluginUi();
-				syncScene();
-			});
-			modeButtons.push(button);
-			modeRow.appendChild(button);
-		});
-		var pluginList = element('div', { className: 'stillframe-snip__choices' });
-		entries.forEach(function (entry) {
-			var label = element('label', { className: 'stillframe-plugin-choice', title: entry.label });
-			var input = element('input');
-			input.type = 'checkbox';
-			input.checked = prefs.keep.indexOf(entry.key) !== -1;
-			input.addEventListener('change', function () {
-				var next = readPrefs();
-				next.plugins = 'choose';
-				next.keep = next.keep.filter(function (key) {
-					return key !== entry.key;
-				});
-				if (input.checked) {
-					next.keep.push(entry.key);
-				}
-				savePrefs(next);
-				refreshPluginUi();
-				syncScene();
-			});
-			label.appendChild(input);
-			label.appendChild(document.createTextNode(entry.label));
-			pluginList.appendChild(label);
-		});
-		if (!entries.length) {
-			pluginsWrap.hidden = true;
-		}
-		pluginHelp.hidden = prefs.plugins === 'all';
-		pluginList.hidden = prefs.plugins !== 'choose';
-		pluginPopover.appendChild(pluginHelp);
-		pluginPopover.appendChild(modeRow);
-		pluginPopover.appendChild(pluginList);
-		pluginsWrap.appendChild(pluginsButton);
-		pluginsWrap.appendChild(pluginPopover);
-
-		function refreshPluginUi() {
-			var current = readPrefs();
-			pluginsButton.textContent = pluginsLabel(current.plugins);
-			modeButtons.forEach(function (button) {
-				button.setAttribute('aria-pressed', button.getAttribute('data-mode') === current.plugins ? 'true' : 'false');
-			});
-			pluginHelp.hidden = current.plugins === 'all';
-			pluginList.hidden = current.plugins !== 'choose';
+		function stopBar(event) {
+			event.stopPropagation();
 		}
 
-		pluginsButton.addEventListener('click', function () {
-			var open = pluginPopover.hidden;
-			closePopovers();
-			pluginPopover.hidden = !open;
-			pluginsButton.setAttribute('aria-expanded', pluginPopover.hidden ? 'false' : 'true');
+		rectButton.setAttribute('aria-pressed', 'true');
+		freeButton.setAttribute('aria-pressed', 'false');
+		windowModeButton.setAttribute('aria-pressed', 'false');
+		rectButton.addEventListener('click', function (event) {
+			stopBar(event);
+			if (!snipBusy) {
+				setMode('rect');
+			}
 		});
-
-		var scaleRow = element('div', {
-			className: 'stillframe-snip__scales',
-			role: 'group',
-			'aria-label': text('scale') || 'Export scale'
+		freeButton.addEventListener('click', function (event) {
+			stopBar(event);
+			if (!snipBusy) {
+				setMode('freeform');
+			}
 		});
-		var scales = Array.isArray(config.scales) && config.scales.length ? config.scales : [
-			{ value: 1, label: '1x' },
-			{ value: 2, label: '2x' },
-			{ value: 3, label: '3x' }
-		];
-		scales.forEach(function (choice) {
-			var value = parseInt(choice.value, 10);
-			if (value !== 1 && value !== 2 && value !== 3) {
+		windowModeButton.addEventListener('click', function (event) {
+			stopBar(event);
+			if (!snipBusy) {
+				setMode('window');
+			}
+		});
+		fullButton.addEventListener('click', function (event) {
+			stopBar(event);
+			if (snipBusy) {
 				return;
 			}
-			var button = element('button', {
-				type: 'button',
-				text: String(choice.label || (value + 'x'))
-			});
-			button.setAttribute('aria-pressed', value === prefs.scale ? 'true' : 'false');
-			button.addEventListener('click', function () {
-				var next = readPrefs();
-				next.scale = value;
-				savePrefs(next);
-				Array.prototype.forEach.call(scaleRow.querySelectorAll('button'), function (item) {
-					item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
-				});
-			});
-			scaleRow.appendChild(button);
-		});
-
-		var widthsWrap = element('div', { className: 'stillframe-snip__popwrap' });
-		var widthsButton = element('button', {
-			type: 'button',
-			className: 'stillframe-snip__menu',
-			text: text('widths') || 'Widths'
-		});
-		widthsButton.setAttribute('aria-expanded', 'false');
-		widthPopover = element('div', { className: 'stillframe-snip__popover' });
-		widthPopover.hidden = true;
-		var presets = Array.isArray(config.presets) ? config.presets : [];
-		presets.forEach(function (preset) {
-			if (!preset) {
-				return;
-			}
-			var presetWidth = parseInt(preset.width, 10);
-			if (!presetWidth) {
-				return;
-			}
-			var button = element('button', {
-				type: 'button',
-				text: String(preset.label || presetWidth)
-			});
-			button.addEventListener('click', function () {
-				beginDevice(presetWidth);
-			});
-			widthPopover.appendChild(button);
-		});
-		if (!widthPopover.childNodes.length) {
-			widthsWrap.hidden = true;
-		}
-		widthsButton.addEventListener('click', function () {
-			var open = widthPopover.hidden;
-			closePopovers();
-			widthPopover.hidden = !open;
-			widthsButton.setAttribute('aria-expanded', widthPopover.hidden ? 'false' : 'true');
-		});
-		widthsWrap.appendChild(widthsButton);
-		widthsWrap.appendChild(widthPopover);
-
-		var fullButton = element('button', {
-			type: 'button',
-			className: 'stillframe-snip__go',
-			text: text('snipFull') || 'Full view'
-		});
-		fullButton.addEventListener('click', function () {
-			closePopovers();
+			var sizeNow = viewSize();
 			captureRect({
 				x: 0,
 				y: 0,
-				width: document.documentElement.clientWidth || window.innerWidth || 1,
-				height: document.documentElement.clientHeight || window.innerHeight || 1
+				width: sizeNow.width,
+				height: sizeNow.height
 			});
 		});
-		var cancelButton = element('button', {
-			type: 'button',
-			text: text('cancel') || 'Cancel'
-		});
-		cancelButton.addEventListener('click', function () {
+		cancelButton.addEventListener('click', function (event) {
+			stopBar(event);
 			cancelSnip();
 		});
-
-		bar.appendChild(topButton);
-		bar.appendChild(sideButton);
-		bar.appendChild(pluginsWrap);
-		bar.appendChild(scaleRow);
-		bar.appendChild(widthsWrap);
+		bar.addEventListener('pointerdown', stopBar);
+		bar.appendChild(rectButton);
+		bar.appendChild(freeButton);
+		bar.appendChild(windowModeButton);
 		bar.appendChild(fullButton);
+		bar.appendChild(sep);
 		bar.appendChild(cancelButton);
 
+		root.appendChild(dimT);
+		root.appendChild(dimL);
+		root.appendChild(dimR);
+		root.appendChild(dimB);
 		root.appendChild(shade);
-		root.appendChild(hint);
 		root.appendChild(box);
 		root.appendChild(size);
+		root.appendChild(pathSvg);
 		root.appendChild(bar);
+		if (document.getElementById('wpadminbar')) {
+			root.classList.add('has-admin-bar');
+		}
 		document.body.appendChild(root);
 		snip = root;
-		syncScene();
 
 		var drag = null;
+		var moveEvent = null;
+		var moveFrame = 0;
+		var hoverFrame = 0;
+
+		function layoutDims(rect) {
+			var vw = window.innerWidth || 0;
+			var vh = window.innerHeight || 0;
+			if (!rect) {
+				dimT.style.cssText = 'left:0;top:0;width:' + vw + 'px;height:' + vh + 'px;';
+				dimL.style.cssText = 'width:0;height:0;';
+				dimR.style.cssText = 'width:0;height:0;';
+				dimB.style.cssText = 'width:0;height:0;';
+				return;
+			}
+			var x = rect.x;
+			var y = rect.y;
+			var w = rect.width;
+			var h = rect.height;
+			dimT.style.cssText = 'left:0;top:0;width:' + vw + 'px;height:' + y + 'px;';
+			dimL.style.cssText = 'left:0;top:' + y + 'px;width:' + x + 'px;height:' + h + 'px;';
+			dimR.style.cssText = 'left:' + (x + w) + 'px;top:' + y + 'px;width:' + Math.max(0, vw - x - w) + 'px;height:' + h + 'px;';
+			dimB.style.cssText = 'left:0;top:' + (y + h) + 'px;width:' + vw + 'px;height:' + Math.max(0, vh - y - h) + 'px;';
+		}
 
 		function showSelection(rect) {
 			if (!rect || rect.width < 1 || rect.height < 1) {
 				box.hidden = true;
 				size.hidden = true;
-				hint.hidden = false;
-				shade.classList.remove('is-selecting');
+				layoutDims(null);
 				return;
 			}
 			box.hidden = false;
 			size.hidden = false;
-			hint.hidden = true;
-			shade.classList.add('is-selecting');
-			box.style.left = rect.x + 'px';
-			box.style.top = rect.y + 'px';
+			layoutDims(rect);
+			box.style.transform = 'translate3d(' + rect.x + 'px,' + rect.y + 'px,0)';
 			box.style.width = rect.width + 'px';
 			box.style.height = rect.height + 'px';
 			size.textContent = Math.round(rect.width) + ' \u00d7 ' + Math.round(rect.height);
 			var top = rect.y + rect.height + 8;
-			if (top > window.innerHeight - 28) {
-				top = Math.max(8, rect.y - 28);
+			if (top > window.innerHeight - 24) {
+				top = Math.max(8, rect.y - 24);
 			}
-			size.style.left = Math.max(8, rect.x) + 'px';
-			size.style.top = top + 'px';
+			size.style.transform = 'translate3d(' + Math.max(8, rect.x) + 'px,' + top + 'px,0)';
 		}
 
+		function pickWindow(clientX, clientY) {
+			var stack = document.elementsFromPoint(clientX, clientY) || [];
+			var node = null;
+			var i;
+			for (i = 0; i < stack.length; i++) {
+				if (root.contains(stack[i])) {
+					continue;
+				}
+				node = stack[i];
+				break;
+			}
+			if (!node || node === document.documentElement) {
+				return document.body;
+			}
+			var best = node;
+			while (node && node !== document.documentElement) {
+				var r = node.getBoundingClientRect();
+				if (r.width >= 80 && r.height >= 40) {
+					best = node;
+					break;
+				}
+				if (node === document.body) {
+					break;
+				}
+				node = node.parentElement;
+			}
+			return best;
+		}
+
+		function rectFromNode(node) {
+			var r = node.getBoundingClientRect();
+			return {
+				x: r.left,
+				y: r.top,
+				width: r.width,
+				height: r.height
+			};
+		}
+
+		function pathBounds(points) {
+			var i;
+			var minX = points[0];
+			var minY = points[1];
+			var maxX = points[0];
+			var maxY = points[1];
+			for (i = 2; i < points.length; i += 2) {
+				if (points[i] < minX) {
+					minX = points[i];
+				}
+				if (points[i] > maxX) {
+					maxX = points[i];
+				}
+				if (points[i + 1] < minY) {
+					minY = points[i + 1];
+				}
+				if (points[i + 1] > maxY) {
+					maxY = points[i + 1];
+				}
+			}
+			return {
+				x: minX,
+				y: minY,
+				width: maxX - minX,
+				height: maxY - minY
+			};
+		}
+
+		layoutDims(null);
+
 		shade.addEventListener('pointerdown', function (event) {
-			if (event.button !== 0) {
+			if (snipBusy || event.button !== 0) {
 				return;
 			}
-			closePopovers();
-			pluginsButton.setAttribute('aria-expanded', 'false');
-			widthsButton.setAttribute('aria-expanded', 'false');
 			event.preventDefault();
+			if (mode === 'window') {
+				captureRect(rectFromNode(pickWindow(event.clientX, event.clientY)));
+				return;
+			}
 			shade.setPointerCapture(event.pointerId);
-			drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+			drag = {
+				id: event.pointerId,
+				x: event.clientX,
+				y: event.clientY,
+				points: mode === 'freeform' ? [event.clientX, event.clientY] : null
+			};
+			if (mode === 'freeform') {
+				pathSvg.setAttribute('viewBox', '0 0 ' + (window.innerWidth || 0) + ' ' + (window.innerHeight || 0));
+				pathSvg.hidden = false;
+				pathLine.setAttribute('points', event.clientX + ',' + event.clientY);
+			}
 			showSelection(normalizeRect(drag.x, drag.y, event.clientX, event.clientY));
 		});
 		shade.addEventListener('pointermove', function (event) {
+			if (mode === 'window' && !drag && !snipBusy) {
+				moveEvent = event;
+				if (hoverFrame) {
+					return;
+				}
+				hoverFrame = window.requestAnimationFrame(function () {
+					hoverFrame = 0;
+					if (mode !== 'window' || drag || snipBusy || !moveEvent) {
+						return;
+					}
+					showSelection(rectFromNode(pickWindow(moveEvent.clientX, moveEvent.clientY)));
+				});
+				return;
+			}
 			if (!drag || drag.id !== event.pointerId) {
 				return;
 			}
-			showSelection(normalizeRect(drag.x, drag.y, event.clientX, event.clientY));
+			moveEvent = event;
+			if (moveFrame) {
+				return;
+			}
+			moveFrame = window.requestAnimationFrame(function () {
+				moveFrame = 0;
+				if (!drag || !moveEvent) {
+					return;
+				}
+				if (drag.points) {
+					drag.points.push(moveEvent.clientX, moveEvent.clientY);
+					var packed = '';
+					var i;
+					for (i = 0; i < drag.points.length; i += 2) {
+						packed += drag.points[i] + ',' + drag.points[i + 1] + ' ';
+					}
+					pathLine.setAttribute('points', packed);
+					showSelection(pathBounds(drag.points));
+					return;
+				}
+				showSelection(normalizeRect(drag.x, drag.y, moveEvent.clientX, moveEvent.clientY));
+			});
 		});
 		shade.addEventListener('pointerup', function (event) {
 			if (!drag || drag.id !== event.pointerId) {
 				return;
 			}
-			var rect = normalizeRect(drag.x, drag.y, event.clientX, event.clientY);
+			var rect;
+			if (drag.points && drag.points.length >= 4) {
+				rect = pathBounds(drag.points);
+			} else {
+				rect = normalizeRect(drag.x, drag.y, event.clientX, event.clientY);
+			}
 			drag = null;
+			moveEvent = null;
 			if (rect.width < 8 || rect.height < 8) {
 				showSelection(null);
+				pathSvg.hidden = true;
+				pathLine.setAttribute('points', '');
 				return;
 			}
 			captureRect(rect);
@@ -1522,11 +1823,11 @@
 				return;
 			}
 			drag = null;
+			moveEvent = null;
 			showSelection(null);
+			pathSvg.hidden = true;
+			pathLine.setAttribute('points', '');
 		});
-		shade.addEventListener('wheel', function (event) {
-			event.preventDefault();
-		}, { passive: false });
 
 		snipKeyHandler = function (event) {
 			if (!snip || event.key !== 'Escape') {
@@ -1534,16 +1835,9 @@
 			}
 			event.preventDefault();
 			event.stopPropagation();
-			if ((pluginPopover && !pluginPopover.hidden) || (widthPopover && !widthPopover.hidden)) {
-				closePopovers();
-				pluginsButton.setAttribute('aria-expanded', 'false');
-				widthsButton.setAttribute('aria-expanded', 'false');
-				return;
-			}
 			cancelSnip();
 		};
 		document.addEventListener('keydown', snipKeyHandler, true);
-		fullButton.focus();
 	}
 
 	function captureInFrame(url, width, scale, isCancelled) {
@@ -1876,8 +2170,9 @@
 		}
 	}
 
-	function buildPanel() {
-		var root = element('div', { className: 'stillframe-capture-panel' });
+	function buildPanel(compact) {
+		compactPanel = !!compact;
+		var root = element('div', { className: compactPanel ? 'stillframe-capture-panel is-compact' : 'stillframe-capture-panel' });
 		var box = element('div', {
 			className: 'stillframe-capture-panel__dialog',
 			role: 'region',
@@ -2036,9 +2331,11 @@
 			api.closePanel();
 		});
 
-		bar.appendChild(widthChoices);
-		bar.appendChild(scaleChoices);
-		bar.appendChild(captureButton);
+		if (!compactPanel) {
+			bar.appendChild(widthChoices);
+			bar.appendChild(scaleChoices);
+			bar.appendChild(captureButton);
+		}
 		bar.appendChild(downloadButton);
 		bar.appendChild(mediaButton);
 		bar.appendChild(closeButton);
@@ -2138,6 +2435,8 @@
 			objectUrl = '';
 		}
 		captured = null;
+		compactPanel = false;
+		invalidateViewShot();
 		if (keyHandler) {
 			document.removeEventListener('keydown', keyHandler, true);
 			keyHandler = null;
@@ -2152,6 +2451,7 @@
 		panel = null;
 		dialog = null;
 		statusNode = null;
+		compactPanel = false;
 		customButton = null;
 		customInput = null;
 		captureButton = null;
@@ -2166,22 +2466,24 @@
 		focusMenu();
 	};
 
-	api.openPanel = function (focusReturn) {
+	api.openPanel = function (focusReturn, compact) {
 		if (panel) {
-			if (captureButton) {
-				captureButton.focus();
+			if (downloadButton) {
+				downloadButton.focus();
 			}
 			return;
 		}
 		returnFocus = focusReturn || null;
 		try {
-			var built = buildPanel();
+			var built = buildPanel(!!compact);
 			panel = built.root;
 			dialog = built.dialog;
 			keyHandler = onKeydown;
 			document.addEventListener('keydown', keyHandler, true);
 			document.body.appendChild(panel);
-			if (captureButton) {
+			if (downloadButton && !downloadButton.hidden) {
+				downloadButton.focus();
+			} else if (captureButton) {
 				captureButton.focus();
 			}
 		} catch (error) {
