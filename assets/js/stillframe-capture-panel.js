@@ -42,8 +42,23 @@
 		id: 0,
 		canvas: null,
 		work: null,
-		scale: 1
+		scale: 1,
+		slow: false
 	};
+
+	// Above this many elements, or after a render slower than SLOW_RENDER_MS,
+	// the page is rendered only after the selection is released. A background
+	// render freezes the main thread and would make the drag stutter.
+	var HEAVY_PAGE_NODES = 1500;
+	var SLOW_RENDER_MS = 700;
+	var IDLE_BEFORE_RENDER_MS = 600;
+
+	function canPrerender() {
+		if (viewShot.slow) {
+			return false;
+		}
+		return document.getElementsByTagName('*').length <= HEAVY_PAGE_NODES;
+	}
 
 	function text(key) {
 		var value = config.i18n && config.i18n[key] ? String(config.i18n[key]) : '';
@@ -254,6 +269,7 @@
 		var size = viewSize();
 		var scale = viewScale();
 		viewShot.scale = scale;
+		var startedAt = Date.now();
 		viewShot.work = waitForReady(document).then(function () {
 			return renderCanvas(document.documentElement, scale, {
 				width: size.width,
@@ -263,6 +279,9 @@
 		}).then(function (canvas) {
 			if (id !== viewShot.id) {
 				return null;
+			}
+			if (Date.now() - startedAt > SLOW_RENDER_MS) {
+				viewShot.slow = true;
 			}
 			viewShot.canvas = canvas;
 			return canvas;
@@ -1829,6 +1848,7 @@
 
 		function stopBar(event) {
 			event.stopPropagation();
+			touch();
 		}
 
 		rectButton.setAttribute('aria-pressed', 'true');
@@ -1888,16 +1908,24 @@
 		var moveFrame = 0;
 		var hoverFrame = 0;
 		var restartTimer = 0;
+		var lastActivity = Date.now();
+
+		function touch() {
+			lastActivity = Date.now();
+		}
 
 		// Rendering the page is heavy main-thread work. Only start it when the
 		// pointer has been idle, so it never competes with a drag or a mode switch.
 		function scheduleShot(delay) {
 			window.clearTimeout(restartTimer);
+			if (!canPrerender()) {
+				return;
+			}
 			restartTimer = window.setTimeout(function () {
 				if (!snip || snipBusy || viewShot.canvas || viewShot.work) {
 					return;
 				}
-				if (drag) {
+				if (drag || Date.now() - lastActivity < IDLE_BEFORE_RENDER_MS) {
 					scheduleShot(300);
 					return;
 				}
@@ -1970,6 +1998,7 @@
 		}
 
 		shade.addEventListener('pointerdown', function (event) {
+			touch();
 			if (snipBusy || event.button !== 0) {
 				return;
 			}
@@ -1987,6 +2016,7 @@
 			showSelection(normalizeRect(drag.x, drag.y, event.clientX, event.clientY));
 		});
 		shade.addEventListener('pointermove', function (event) {
+			touch();
 			if (mode === 'window' && !drag && !snipBusy) {
 				moveEvent = event;
 				if (hoverFrame) {
@@ -2062,7 +2092,7 @@
 
 		// Render the page in the background while the user chooses, so the
 		// selection can be cropped from a ready image the moment they let go.
-		scheduleShot(350);
+		scheduleShot(IDLE_BEFORE_RENDER_MS);
 	}
 
 	function captureInFrame(url, width, scale, isCancelled) {

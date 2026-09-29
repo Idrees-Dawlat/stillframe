@@ -2,7 +2,7 @@
 Contributors: grafucci
 Tags: screenshot, capture, annotate, media library, png
 Requires at least: 6.4
-Tested up to: 7.1.2
+Tested up to: 7.1
 Stable tag: 0.1.7
 Requires PHP: 7.4
 License: GPL-2.0-or-later
@@ -58,6 +58,7 @@ Stillframe bundles modern-screenshot 4.7.0 (MIT license) as `assets/js/vendor/mo
 == Changelog ==
 
 = 0.1.7 =
+* Fixed the area selection stuttering when the capture toolbar first opens: the background page render now waits until the pointer is idle and is skipped on very heavy pages
 * Readme, translation and code-standards cleanup for the WordPress.org review
 
 = 0.1.6 =
