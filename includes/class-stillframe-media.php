@@ -40,6 +40,8 @@ class Stillframe_Media {
 
 		check_ajax_referer( 'stillframe_save_media', 'nonce' );
 
+		// Nonce and capability are verified above; the upload is validated below.
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
 		if ( empty( $_FILES['image'] ) || ! is_array( $_FILES['image'] ) ) {
 			$this->fail();
 		}
@@ -92,6 +94,8 @@ class Stillframe_Media {
 				),
 			)
 		);
+
+		// phpcs:enable
 
 		if ( ! is_array( $moved ) || empty( $moved['file'] ) || ! empty( $moved['error'] ) ) {
 			$this->fail();

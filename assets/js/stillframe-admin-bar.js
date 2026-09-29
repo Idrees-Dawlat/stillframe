@@ -141,8 +141,13 @@
 	function svgIcon(paths) {
 		var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 		svg.setAttribute('viewBox', '0 0 24 24');
-		svg.setAttribute('width', '20');
-		svg.setAttribute('height', '20');
+		svg.setAttribute('width', '18');
+		svg.setAttribute('height', '18');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'currentColor');
+		svg.setAttribute('stroke-width', '1.8');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
 		svg.setAttribute('aria-hidden', 'true');
 		paths.forEach(function (d) {
 			var path = document.createElementNS('http://www.w3.org/2000/svg', d.tag || 'path');
@@ -157,12 +162,19 @@
 		return svg;
 	}
 
-	function bootButton(pressed) {
+	function bootButton(paths, label, pressed) {
 		var button = document.createElement('button');
 		button.type = 'button';
 		button.tabIndex = -1;
 		if (pressed) {
 			button.setAttribute('aria-pressed', 'true');
+		}
+		button.appendChild(svgIcon(paths));
+		if (label) {
+			var span = document.createElement('span');
+			span.className = 'stillframe-btn__label';
+			span.textContent = label;
+			button.appendChild(span);
 		}
 		return button;
 	}
@@ -183,29 +195,27 @@
 		shade.className = 'stillframe-snip__shade';
 		var bar = document.createElement('div');
 		bar.className = 'stillframe-snip__bar';
-		var rect = bootButton(true);
-		rect.appendChild(svgIcon([{ tag: 'rect', x: '4', y: '6', width: '16', height: '12', rx: '2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' }]));
-		var free = bootButton();
-		free.appendChild(svgIcon([{ d: 'M4 17c2.2-7 3.2-1.5 5.4-6.2 1.6-3.4 2.4 4.8 4.6 1.6 1.8-2.6 2.6-5.4 6-3.2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round' }]));
-		var win = bootButton();
-		win.appendChild(svgIcon([
-			{ tag: 'rect', x: '3', y: '5', width: '12', height: '9', rx: '1.5', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' },
-			{ tag: 'rect', x: '8', y: '10', width: '12', height: '9', rx: '1.5', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8' }
-		]));
-		var full = bootButton();
-		full.appendChild(svgIcon([{ d: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round' }]));
+		var area = bootButton([{ tag: 'rect', x: '4', y: '5', width: '16', height: '14', rx: '2.5', 'stroke-dasharray': '3.2 2.6' }], text('snipRect') || 'Area', true);
+		var win = bootButton([
+			{ tag: 'rect', x: '3.5', y: '5', width: '17', height: '14', rx: '2.5' },
+			{ d: 'M3.5 9.5h17' }
+		], text('snipWindow') || 'Window');
+		var full = bootButton([{ d: 'M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15' }], text('snipFull') || 'Full screen');
 		var sep = document.createElement('span');
 		sep.className = 'stillframe-snip__sep';
-		var close = bootButton();
-		close.appendChild(svgIcon([{ d: 'M6 6l12 12M18 6L6 18', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round' }]));
-		bar.appendChild(rect);
-		bar.appendChild(free);
+		var close = bootButton([{ d: 'M6 6l12 12M18 6L6 18' }]);
+		close.className = 'stillframe-snip__close';
+		bar.appendChild(area);
 		bar.appendChild(win);
 		bar.appendChild(full);
 		bar.appendChild(sep);
 		bar.appendChild(close);
 		root.appendChild(shade);
+		var hint = document.createElement('div');
+		hint.className = 'stillframe-snip__hint';
+		hint.textContent = text('snipHint') || 'Drag to select an area';
 		root.appendChild(bar);
+		root.appendChild(hint);
 		document.body.appendChild(root);
 	}
 

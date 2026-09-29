@@ -32,10 +32,17 @@
 	var sceneRestore = null;
 	var morePopover = null;
 	var compactPanel = false;
+	var resultReady = false;
+	var pendingAction = '';
+	var resultObserver = null;
+	var snipCleanup = null;
+	var toolColor = '#ef4444';
+	var toolSize = 4;
 	var viewShot = {
 		id: 0,
 		canvas: null,
-		work: null
+		work: null,
+		scale: 1
 	};
 
 	function text(key) {
@@ -67,9 +74,24 @@
 		return node;
 	}
 
-	function setStatus(message, linkHref, linkLabel) {
+	var statusTimer = 0;
+
+	function setStatus(message, linkHref, linkLabel, tone) {
 		if (!statusNode) {
 			return;
+		}
+		window.clearTimeout(statusTimer);
+		if (tone) {
+			statusNode.setAttribute('data-tone', tone);
+		} else {
+			statusNode.removeAttribute('data-tone');
+		}
+		if (tone === 'success' && message) {
+			statusTimer = window.setTimeout(function () {
+				if (statusNode) {
+					setStatus('');
+				}
+			}, 9000);
 		}
 		while (statusNode.firstChild) {
 			statusNode.removeChild(statusNode.firstChild);
@@ -91,6 +113,7 @@
 		}
 		statusNode.appendChild(document.createTextNode(' '));
 		statusNode.appendChild(element('a', {
+			className: 'stillframe-result__status-link',
 			href: link.toString(),
 			text: linkLabel,
 			target: '_blank',
@@ -220,14 +243,24 @@
 		viewShot.work = null;
 	}
 
+	function viewScale() {
+		var ratio = window.devicePixelRatio || 1;
+		return ratio >= 1.5 ? 2 : 1;
+	}
+
 	function startViewShot() {
 		var id = ++viewShot.id;
 		viewShot.canvas = null;
 		var size = viewSize();
-		viewShot.work = renderCanvas(document.documentElement, 1, {
-			width: size.width,
-			height: size.height
-		}, window).then(function (canvas) {
+		var scale = viewScale();
+		viewShot.scale = scale;
+		viewShot.work = waitForReady(document).then(function () {
+			return renderCanvas(document.documentElement, scale, {
+				width: size.width,
+				height: size.height,
+				crop: { x: 0, y: 0, width: size.width, height: size.height }
+			}, window);
+		}).then(function (canvas) {
 			if (id !== viewShot.id) {
 				return null;
 			}
@@ -345,6 +378,8 @@
 			onChange: syncMarkButtons
 		});
 		editor.setTool('pen');
+		editor.setColor(toolColor);
+		editor.setSize(toolSize);
 		if (panel) {
 			Array.prototype.forEach.call(panel.querySelectorAll('.stillframe-tool'), function (button) {
 				button.setAttribute('aria-pressed', button === penButton ? 'true' : 'false');
@@ -469,9 +504,16 @@
 					resolve();
 					return;
 				}
-				window.requestAnimationFrame(function () {
+				var done = false;
+				var next = function () {
+					if (done) {
+						return;
+					}
+					done = true;
 					step(left - 1);
-				});
+				};
+				window.requestAnimationFrame(next);
+				window.setTimeout(next, 80);
 			}
 			step(count);
 		});
@@ -912,6 +954,10 @@
 			document.removeEventListener('keydown', snipKeyHandler, true);
 			snipKeyHandler = null;
 		}
+		if (snipCleanup) {
+			snipCleanup();
+			snipCleanup = null;
+		}
 		if (snip && snip.parentNode) {
 			snip.parentNode.removeChild(snip);
 		}
@@ -1010,11 +1056,55 @@
 		}
 	}
 
+	function markElements(doc, crop) {
+		var marked = [];
+		var win = doc.defaultView;
+		var all = doc.body ? doc.body.getElementsByTagName('*') : [];
+		var i;
+		for (i = 0; i < all.length; i++) {
+			var el = all[i];
+			var style;
+			try {
+				style = win.getComputedStyle(el);
+			} catch (error) {
+				continue;
+			}
+			if (style.position === 'fixed' && !(el.parentElement && el.parentElement.closest('[data-stillframe-fixed]'))) {
+				el.setAttribute('data-stillframe-fixed', '1');
+				marked.push([el, 'data-stillframe-fixed']);
+			}
+			// Images that are far outside the captured area would only slow the
+			// render down. Their boxes stay, so the layout does not move.
+			var tag = el.tagName;
+			var heavy = tag === 'IMG' || tag === 'VIDEO' || tag === 'CANVAS' || (style.backgroundImage && style.backgroundImage !== 'none');
+			if (heavy) {
+				var rect = el.getBoundingClientRect();
+				if (rect.bottom < crop.y - 200 || rect.top > crop.y + crop.height + 200 || rect.right < crop.x - 200 || rect.left > crop.x + crop.width + 200) {
+					el.setAttribute('data-stillframe-off', '1');
+					marked.push([el, 'data-stillframe-off']);
+				}
+			}
+		}
+		return function () {
+			marked.forEach(function (item) {
+				item[0].removeAttribute(item[1]);
+			});
+		};
+	}
+
 	function prepareClone(root, view, crop) {
 		if (!root || root.nodeType !== 1) {
 			return;
 		}
 		var doc = view.document;
+		Array.prototype.forEach.call(root.querySelectorAll('[data-stillframe-off]'), function (node) {
+			if (node.tagName === 'IMG') {
+				node.removeAttribute('srcset');
+				node.setAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+			} else {
+				node.style.setProperty('background-image', 'none', 'important');
+			}
+		});
 		var sx = (view.scrollX || doc.documentElement.scrollLeft || 0) + (crop ? crop.x : 0);
 		var sy = (view.scrollY || doc.documentElement.scrollTop || 0) + (crop ? crop.y : 0);
 		if (!sx && !sy) {
@@ -1027,16 +1117,16 @@
 		}
 		body.style.setProperty('transform', 'translate(' + (-sx) + 'px,' + (-sy) + 'px)', 'important');
 		body.style.setProperty('transform-origin', '0 0', 'important');
-		['wpadminbar', 'adminmenuwrap', 'adminmenuback'].forEach(function (id) {
-			var node = root.querySelector('#' + id);
-			if (!node) {
-				return;
-			}
-			node.style.setProperty('transform', 'translate(' + sx + 'px,' + sy + 'px)', 'important');
+		// A transformed body becomes the containing block of fixed elements, so
+		// they are moved back to where the viewport actually showed them.
+		var bodyRect = doc.body.getBoundingClientRect();
+		var shift = (-bodyRect.left) + 'px ' + (-bodyRect.top) + 'px';
+		Array.prototype.forEach.call(root.querySelectorAll('[data-stillframe-fixed]'), function (node) {
+			node.style.setProperty('translate', shift, 'important');
 		});
 	}
 
-	function makeFilter(view, crop) {
+	function makeFilter() {
 		return function (nodeToKeep) {
 			if (!nodeToKeep || nodeToKeep.nodeType !== 1) {
 				return true;
@@ -1053,24 +1143,6 @@
 			)) {
 				return false;
 			}
-			if (!crop) {
-				return true;
-			}
-			if (tag === 'HTML' || tag === 'BODY' || tag === 'HEAD' || tag === 'STYLE' || tag === 'LINK' || tag === 'META' || tag === 'TITLE') {
-				return true;
-			}
-			var rect;
-			try {
-				rect = nodeToKeep.getBoundingClientRect();
-			} catch (error) {
-				return true;
-			}
-			if (rect.width < 1 && rect.height < 1) {
-				return true;
-			}
-			if (rect.bottom < crop.y || rect.top > crop.y + crop.height || rect.right < crop.x || rect.left > crop.x + crop.width) {
-				return false;
-			}
 			return true;
 		};
 	}
@@ -1083,19 +1155,19 @@
 			return Promise.reject(missing);
 		}
 		var crop = bounds && bounds.crop ? bounds.crop : null;
+		var unmark = crop ? markElements(view.document, crop) : function () {};
 		try {
 			var options = {
 				scale: scale,
 				backgroundColor: '#ffffff',
 				maximumCanvasSize: 0,
-				timeout: 250,
-				font: false,
+				timeout: 4000,
 				features: {
 					restoreScrollPosition: false,
 					copyScrollbar: false,
 					fixSvgXmlDecode: false
 				},
-				filter: makeFilter(view, crop),
+				filter: makeFilter(),
 				onCloneNode: function (cloned) {
 					try {
 						prepareClone(cloned, view, crop);
@@ -1108,8 +1180,15 @@
 				options.width = bounds.width;
 				options.height = bounds.height;
 			}
-			return window.modernScreenshot.domToCanvas(node, options);
+			return window.modernScreenshot.domToCanvas(node, options).then(function (canvas) {
+				unmark();
+				return canvas;
+			}, function (error) {
+				unmark();
+				throw error;
+			});
 		} catch (error) {
+			unmark();
 			if (error && !error.code) {
 				error.code = 'failed';
 			}
@@ -1172,11 +1251,14 @@
 		});
 	}
 
-	function failSnip() {
-		snipBusy = false;
-		if (snip) {
-			snip.style.visibility = '';
+	function getViewCanvas() {
+		if (viewShot.canvas) {
+			return Promise.resolve(viewShot.canvas);
 		}
+		var pending = viewShot.work || startViewShot();
+		return pending.then(function (canvas) {
+			return canvas || getViewCanvas();
+		});
 	}
 
 	function captureRect(rect) {
@@ -1184,76 +1266,227 @@
 		if (snipBusy || rect.width < 8 || rect.height < 8) {
 			return;
 		}
-		snipBusy = true;
 		var token = session;
-		if (snip) {
-			snip.style.visibility = 'hidden';
+		var work = getViewCanvas().then(function (canvas) {
+			return cropCanvasToBlob(canvas, rect, viewShot.scale);
+		});
+		openResult(rect, work, token);
+		destroySnip();
+	}
+
+	function exportBlob() {
+		if (!editor) {
+			return Promise.reject(new Error('editor'));
 		}
-		window.requestAnimationFrame(function () {
-			if (token !== session) {
+		if (!editor.hasMarks() && captured && captured.blob) {
+			return Promise.resolve(captured.blob);
+		}
+		return editor.flatten();
+	}
+
+	function pendingLabel(kind) {
+		return kind === 'media' ? mediaButton : downloadButton;
+	}
+
+	function setActionLoading(button, loading) {
+		if (!button) {
+			return;
+		}
+		button.classList.toggle('is-loading', !!loading);
+		if (loading) {
+			button.setAttribute('aria-busy', 'true');
+		} else {
+			button.removeAttribute('aria-busy');
+		}
+	}
+
+	function runDownload() {
+		if (!editor || !captured) {
+			return;
+		}
+		var button = downloadButton;
+		setActionLoading(button, true);
+		exportBlob().then(function (blob) {
+			saveBlob(blob, fileNameFor(captured.url, captured.width, captured.scale));
+			if (!panel) {
 				return;
 			}
-			renderCanvas(document.documentElement, 1, {
-				width: Math.max(1, Math.round(rect.width)),
-				height: Math.max(1, Math.round(rect.height)),
-				crop: rect
-			}, window).then(function (canvas) {
-				if (token !== session || !canvas) {
-					return null;
-				}
-				return canvasToBlob(canvas);
-			}).then(function (blob) {
-				if (token !== session || !blob) {
-					return;
-				}
-				if (objectUrl) {
-					URL.revokeObjectURL(objectUrl);
-					objectUrl = '';
-				}
-				objectUrl = URL.createObjectURL(blob);
-				var image = new Image();
-				image.alt = text('capturedAlt');
-				image.draggable = false;
-				image.onload = function () {
-					if (token !== session) {
-						return;
-					}
-					snipBusy = false;
-					openResult(image, rect);
-					destroySnip();
-				};
-				image.onerror = function () {
-					failSnip();
-				};
-				image.src = objectUrl;
-			}).catch(function () {
-				if (token !== session) {
-					return;
-				}
-				failSnip();
-			});
+			setActionLoading(button, false);
+			setStatus(text('downloaded') || 'Downloaded.', '', '', 'success');
+		}).catch(function () {
+			if (!panel) {
+				return;
+			}
+			setActionLoading(button, false);
+			setStatus(text('downloadFailed'), '', '', 'error');
 		});
 	}
 
-	function bindDownload(button) {
-		button.addEventListener('click', function () {
-			if (!editor || !captured) {
-				return;
+	function requestAction(kind) {
+		if (!resultReady) {
+			pendingAction = kind;
+			setActionLoading(pendingLabel(kind), true);
+			setStatus(text('queued') || 'Almost there. This will finish as soon as the capture is ready.', '', '', 'busy');
+			return;
+		}
+		if (kind === 'media') {
+			saveToMedia();
+		} else {
+			runDownload();
+		}
+	}
+
+	function flushPending() {
+		var kind = pendingAction;
+		pendingAction = '';
+		if (!kind) {
+			return;
+		}
+		setActionLoading(pendingLabel(kind), false);
+		requestAction(kind);
+	}
+
+	function fitResultImage() {
+		var image = canvasWrap ? canvasWrap.querySelector('img') : null;
+		var stage = editorSection;
+		if (!image || !stage || !image.naturalWidth || !image.naturalHeight) {
+			return;
+		}
+		var scale = captured && captured.scale ? captured.scale : 1;
+		var availW = Math.max(60, stage.clientWidth - 48);
+		var availH = Math.max(60, stage.clientHeight - 48);
+		var w = image.naturalWidth / scale;
+		var h = image.naturalHeight / scale;
+		var ratio = Math.min(1, availW / w, availH / h);
+		image.style.width = Math.max(1, Math.floor(w * ratio)) + 'px';
+		image.style.height = Math.max(1, Math.floor(h * ratio)) + 'px';
+	}
+
+	function loadResultImage(blob) {
+		return new Promise(function (resolve, reject) {
+			if (objectUrl) {
+				URL.revokeObjectURL(objectUrl);
+				objectUrl = '';
 			}
-			button.disabled = true;
-			setStatus(text('preparing'));
-			editor.flatten().then(function (blob) {
-				saveBlob(blob, fileNameFor(captured.url, captured.width, captured.scale));
-				button.disabled = false;
-				setStatus('');
-			}).catch(function () {
-				button.disabled = false;
-				setStatus(text('downloadFailed'));
-			});
+			objectUrl = URL.createObjectURL(blob);
+			var image = new Image();
+			image.alt = text('capturedAlt');
+			image.draggable = false;
+			image.onload = function () {
+				resolve(image);
+			};
+			image.onerror = function () {
+				var failed = new Error('failed');
+				failed.code = 'failed';
+				reject(failed);
+			};
+			image.src = objectUrl;
 		});
 	}
 
-	function openResult(image, rect) {
+	function showLoader(message) {
+		clearWrap();
+		var loader = element('div', { className: 'stillframe-result__loader', role: 'status' });
+		loader.appendChild(element('span', { className: 'stillframe-result__spinner', 'aria-hidden': 'true' }));
+		loader.appendChild(element('span', { text: message }));
+		canvasWrap.appendChild(loader);
+	}
+
+	function svgNode(name, attrs) {
+		var node = document.createElementNS('http://www.w3.org/2000/svg', name);
+		if (attrs) {
+			Object.keys(attrs).forEach(function (key) {
+				node.setAttribute(key, attrs[key]);
+			});
+		}
+		return node;
+	}
+
+	var ICONS = {
+		area: [
+			{ tag: 'rect', x: '4', y: '5', width: '16', height: '14', rx: '2.5', 'stroke-dasharray': '3.2 2.6' }
+		],
+		window: [
+			{ tag: 'rect', x: '3.5', y: '5', width: '17', height: '14', rx: '2.5' },
+			{ d: 'M3.5 9.5h17' },
+			{ tag: 'circle', cx: '6.6', cy: '7.3', r: '0.5' }
+		],
+		full: [
+			{ d: 'M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15' }
+		],
+		close: [
+			{ d: 'M6 6l12 12M18 6L6 18' }
+		],
+		pen: [
+			{ d: 'M4 20l1-4.2L16.6 4.2a2.1 2.1 0 0 1 3 3L8.2 19 4 20z' },
+			{ d: 'M14.5 6.3l3.2 3.2' }
+		],
+		circle: [
+			{ tag: 'ellipse', cx: '12', cy: '12', rx: '8', ry: '6.5' }
+		],
+		arrow: [
+			{ d: 'M5 19L18.5 5.5M9.5 5h9.5v9.5' }
+		],
+		undo: [
+			{ d: 'M9 14L4 9l5-5' },
+			{ d: 'M4 9h10a6 6 0 0 1 0 12h-3' }
+		],
+		clear: [
+			{ d: 'M4 7h16M9.5 11v6M14.5 11v6M6 7l.9 11.2A2 2 0 0 0 8.9 20h6.2a2 2 0 0 0 2-1.8L18 7M9 7V4.5h6V7' }
+		],
+		download: [
+			{ d: 'M12 4v11M7.5 11L12 15.5 16.5 11M5 20h14' }
+		],
+		media: [
+			{ tag: 'rect', x: '3.5', y: '4.5', width: '17', height: '15', rx: '2.5' },
+			{ tag: 'circle', cx: '9', cy: '10', r: '1.6' },
+			{ d: 'M20.5 16l-5-5L8 19.5' }
+		]
+	};
+
+	function iconSvg(name, size) {
+		var svg = svgNode('svg', {
+			viewBox: '0 0 24 24',
+			width: String(size || 18),
+			height: String(size || 18),
+			fill: 'none',
+			stroke: 'currentColor',
+			'stroke-width': '1.8',
+			'stroke-linecap': 'round',
+			'stroke-linejoin': 'round',
+			'aria-hidden': 'true',
+			focusable: 'false'
+		});
+		(ICONS[name] || []).forEach(function (spec) {
+			var attrs = {};
+			Object.keys(spec).forEach(function (key) {
+				if (key !== 'tag') {
+					attrs[key] = spec[key];
+				}
+			});
+			svg.appendChild(svgNode(spec.tag || 'path', attrs));
+		});
+		return svg;
+	}
+
+	function iconButton(name, label, className, showLabel, hint) {
+		var button = element('button', {
+			type: 'button',
+			className: className || '',
+			'aria-label': label,
+			title: hint || label
+		});
+		button.appendChild(iconSvg(name, showLabel ? 18 : 20));
+		if (showLabel) {
+			button.appendChild(element('span', { className: 'stillframe-btn__label', text: showLabel === true ? label : showLabel }));
+		}
+		return button;
+	}
+
+	var SWATCHES = ['#ef4444', '#f59e0b', '#facc15', '#059669', '#005976', '#3b82f6', '#ffffff', '#111827'];
+	var SIZES = [2.5, 4, 7];
+
+	function openResult(rect, work, token) {
 		if (editor) {
 			editor.destroy();
 			editor = null;
@@ -1267,10 +1500,14 @@
 		}
 
 		compactPanel = true;
+		resultReady = false;
+		pendingAction = '';
 		captured = {
 			width: Math.max(1, Math.round(rect.width)),
-			scale: 1,
-			url: window.location.href
+			height: Math.max(1, Math.round(rect.height)),
+			scale: viewShot.scale || 1,
+			url: window.location.href,
+			blob: null
 		};
 
 		var root = element('div', {
@@ -1286,40 +1523,24 @@
 			text: text('heading')
 		});
 		var toolbar = element('div', { className: 'stillframe-result__toolbar' });
-		var saveGroup = element('div', { className: 'stillframe-result__group' });
+
+		var brand = element('div', { className: 'stillframe-result__brand' });
+		brand.appendChild(element('span', { className: 'stillframe-result__name', text: 'Stillframe' }));
+		brand.appendChild(element('span', {
+			className: 'stillframe-result__dims',
+			text: captured.width + ' × ' + captured.height
+		}));
+
 		var markGroup = element('div', {
-			className: 'stillframe-result__group',
+			className: 'stillframe-result__tools',
 			role: 'group',
 			'aria-label': text('tools')
 		});
 
-		downloadButton = element('button', {
-			type: 'button',
-			className: 'stillframe-btn stillframe-btn-primary',
-			text: text('download')
-		});
-		bindDownload(downloadButton);
-
-		mediaButton = element('button', {
-			type: 'button',
-			className: 'stillframe-btn',
-			text: text('saveMedia')
-		});
-		mediaButton.addEventListener('click', saveToMedia);
-		if (!config.canUpload) {
-			mediaButton.hidden = true;
-		}
-
-		saveGroup.appendChild(downloadButton);
-		saveGroup.appendChild(mediaButton);
-
-		function addTool(name, label, pressed) {
-			var button = element('button', {
-				type: 'button',
-				className: 'stillframe-btn stillframe-tool',
-				text: label
-			});
+		function addTool(name, label, key, pressed) {
+			var button = iconButton(name, label, 'stillframe-tool', false, label + ' (' + key.toUpperCase() + ')');
 			button.setAttribute('data-tool', name);
+			button.setAttribute('data-key', key);
 			button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
 			button.addEventListener('click', function () {
 				Array.prototype.forEach.call(markGroup.querySelectorAll('.stillframe-tool'), function (item) {
@@ -1333,47 +1554,114 @@
 			return button;
 		}
 
-		penButton = addTool('pen', text('pen'), true);
-		addTool('circle', text('circle'), false);
-		addTool('arrow', text('arrow'), false);
-		undoButton = element('button', {
-			type: 'button',
-			className: 'stillframe-btn',
-			text: text('undo')
+		penButton = addTool('pen', text('pen') || 'Pen', 'p', true);
+		addTool('circle', text('circle') || 'Circle', 'c', false);
+		addTool('arrow', text('arrow') || 'Arrow', 'a', false);
+
+		var colorGroup = element('div', {
+			className: 'stillframe-result__swatches',
+			role: 'group',
+			'aria-label': text('colors') || 'Color'
 		});
+		SWATCHES.forEach(function (hex) {
+			var swatch = element('button', {
+				type: 'button',
+				className: 'stillframe-swatch',
+				'aria-label': hex,
+				title: hex
+			});
+			swatch.style.setProperty('--sf-swatch', hex);
+			swatch.setAttribute('aria-pressed', hex === toolColor ? 'true' : 'false');
+			swatch.addEventListener('click', function () {
+				toolColor = hex;
+				Array.prototype.forEach.call(colorGroup.querySelectorAll('.stillframe-swatch'), function (item) {
+					item.setAttribute('aria-pressed', item === swatch ? 'true' : 'false');
+				});
+				if (editor) {
+					editor.setColor(hex);
+				}
+			});
+			colorGroup.appendChild(swatch);
+		});
+
+		var sizeGroup = element('div', {
+			className: 'stillframe-result__sizes',
+			role: 'group',
+			'aria-label': text('thickness') || 'Line thickness'
+		});
+		SIZES.forEach(function (value, index) {
+			var sizeButton = element('button', {
+				type: 'button',
+				className: 'stillframe-size',
+				'aria-label': (text('thickness') || 'Line thickness') + ' ' + (index + 1),
+				title: (text('thickness') || 'Line thickness') + ' ' + (index + 1)
+			});
+			var dot = element('span', { className: 'stillframe-size__dot' });
+			dot.style.setProperty('--sf-dot', (value + 3) + 'px');
+			sizeButton.appendChild(dot);
+			sizeButton.setAttribute('aria-pressed', value === toolSize ? 'true' : 'false');
+			sizeButton.addEventListener('click', function () {
+				toolSize = value;
+				Array.prototype.forEach.call(sizeGroup.querySelectorAll('.stillframe-size'), function (item) {
+					item.setAttribute('aria-pressed', item === sizeButton ? 'true' : 'false');
+				});
+				if (editor) {
+					editor.setSize(value);
+				}
+			});
+			sizeGroup.appendChild(sizeButton);
+		});
+
+		var historyGroup = element('div', {
+			className: 'stillframe-result__history',
+			role: 'group'
+		});
+		undoButton = iconButton('undo', text('undo') || 'Undo', 'stillframe-icon-btn', false, (text('undo') || 'Undo') + ' (Ctrl+Z)');
 		undoButton.disabled = true;
 		undoButton.addEventListener('click', function () {
 			if (editor) {
 				editor.undo();
 			}
 		});
-		clearButton = element('button', {
-			type: 'button',
-			className: 'stillframe-btn',
-			text: text('clear')
-		});
+		clearButton = iconButton('clear', text('clear') || 'Clear', 'stillframe-icon-btn', false, text('clear') || 'Clear');
 		clearButton.disabled = true;
 		clearButton.addEventListener('click', function () {
 			if (editor) {
 				editor.clear();
 			}
 		});
-		markGroup.appendChild(undoButton);
-		markGroup.appendChild(clearButton);
+		historyGroup.appendChild(undoButton);
+		historyGroup.appendChild(clearButton);
 
-		var closeButton = element('button', {
-			type: 'button',
-			className: 'stillframe-btn stillframe-result__close',
-			text: '\u00d7',
-			'aria-label': text('close')
+		var toolsWrap = element('div', { className: 'stillframe-result__editing' });
+		toolsWrap.appendChild(markGroup);
+		toolsWrap.appendChild(colorGroup);
+		toolsWrap.appendChild(sizeGroup);
+		toolsWrap.appendChild(historyGroup);
+
+		var saveGroup = element('div', { className: 'stillframe-result__actions' });
+		mediaButton = iconButton('media', text('saveMedia'), 'stillframe-btn', true);
+		mediaButton.addEventListener('click', function () {
+			requestAction('media');
 		});
+		if (!config.canUpload) {
+			mediaButton.hidden = true;
+		}
+		downloadButton = iconButton('download', text('download'), 'stillframe-btn stillframe-btn-primary', true);
+		downloadButton.addEventListener('click', function () {
+			requestAction('download');
+		});
+		var closeButton = iconButton('close', text('close'), 'stillframe-btn stillframe-result__close', false, text('close') + ' (Esc)');
 		closeButton.addEventListener('click', function () {
 			api.closePanel();
 		});
+		saveGroup.appendChild(mediaButton);
+		saveGroup.appendChild(downloadButton);
+		saveGroup.appendChild(closeButton);
 
+		toolbar.appendChild(brand);
+		toolbar.appendChild(toolsWrap);
 		toolbar.appendChild(saveGroup);
-		toolbar.appendChild(markGroup);
-		toolbar.appendChild(closeButton);
 
 		statusNode = element('p', {
 			className: 'stillframe-result__status',
@@ -1394,54 +1682,105 @@
 		panel = root;
 		dialog = win;
 		keyHandler = function (event) {
-			if (event.key !== 'Escape') {
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				event.stopPropagation();
+				api.closePanel();
 				return;
 			}
-			event.preventDefault();
-			event.stopPropagation();
-			api.closePanel();
+			if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z') && !event.shiftKey) {
+				event.preventDefault();
+				if (editor) {
+					editor.undo();
+				}
+				return;
+			}
+			if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) {
+				return;
+			}
+			var pick = markGroup.querySelector('.stillframe-tool[data-key="' + String(event.key).toLowerCase() + '"]');
+			if (pick && !pick.disabled) {
+				event.preventDefault();
+				pick.click();
+			}
 		};
 		document.addEventListener('keydown', keyHandler, true);
 		document.body.appendChild(root);
-		mountEditor(image);
-		setBusy(false);
+
+		if (typeof window.ResizeObserver === 'function') {
+			resultObserver = new window.ResizeObserver(fitResultImage);
+			resultObserver.observe(stage);
+		}
+
+		showLoader(text('capturingShort') || 'Capturing…');
+		setResultLoading(true);
 		if (downloadButton) {
 			downloadButton.focus();
 		}
+
+		work.then(function (blob) {
+			if (token !== session || !panel || !blob) {
+				return null;
+			}
+			captured.blob = blob;
+			return loadResultImage(blob);
+		}).then(function (image) {
+			if (!image || token !== session || !panel) {
+				return;
+			}
+			mountEditor(image);
+			fitResultImage();
+			resultReady = true;
+			setResultLoading(false);
+			setStatus('');
+			flushPending();
+		}).catch(function (error) {
+			if (token !== session || !panel) {
+				return;
+			}
+			pendingAction = '';
+			setActionLoading(downloadButton, false);
+			setActionLoading(mediaButton, false);
+			clearWrap();
+			canvasWrap.appendChild(element('div', {
+				className: 'stillframe-result__loader is-error',
+				text: error && error.code === 'library' ? text('libraryMissing') : text('captureFailed')
+			}));
+			setStatus('');
+			if (dialog) {
+				dialog.setAttribute('aria-busy', 'false');
+			}
+		});
 	}
 
-	function svgNode(name, attrs) {
-		var node = document.createElementNS('http://www.w3.org/2000/svg', name);
-		if (attrs) {
-			Object.keys(attrs).forEach(function (key) {
-				node.setAttribute(key, attrs[key]);
-			});
+	function setResultLoading(loading) {
+		if (dialog) {
+			dialog.setAttribute('aria-busy', loading ? 'true' : 'false');
+			dialog.classList.toggle('is-loading', !!loading);
 		}
-		return node;
-	}
-
-	function iconButton(label, draw) {
-		var button = element('button', {
-			type: 'button',
-			'aria-label': label,
-			title: label
+		if (!panel) {
+			return;
+		}
+		Array.prototype.forEach.call(panel.querySelectorAll('.stillframe-tool, .stillframe-swatch, .stillframe-size'), function (button) {
+			button.disabled = !!loading;
 		});
-		var svg = svgNode('svg', {
-			viewBox: '0 0 24 24',
-			width: '20',
-			height: '20',
-			'aria-hidden': 'true',
-			focusable: 'false'
-		});
-		draw(svg);
-		button.appendChild(svg);
-		return button;
+		if (loading) {
+			if (undoButton) {
+				undoButton.disabled = true;
+			}
+			if (clearButton) {
+				clearButton.disabled = true;
+			}
+		} else {
+			syncMarkButtons();
+		}
 	}
 
 	function openSnip() {
 		if (snip) {
 			return;
 		}
+		invalidateViewShot();
 		var boot = document.getElementById('stillframe-snip-boot');
 		if (boot && boot.parentNode) {
 			boot.parentNode.removeChild(boot);
@@ -1453,105 +1792,39 @@
 			'aria-label': text('heading') || 'Capture this screen'
 		});
 		root.setAttribute('data-mode', 'rect');
-		var dimT = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--t' });
-		var dimL = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--l' });
-		var dimR = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--r' });
-		var dimB = element('div', { className: 'stillframe-snip__dim stillframe-snip__dim--b' });
 		var shade = element('div', { className: 'stillframe-snip__shade' });
 		var box = element('div', { className: 'stillframe-snip__box' });
 		var size = element('div', { className: 'stillframe-snip__size' });
-		var pathSvg = svgNode('svg', {
-			class: 'stillframe-snip__path',
-			'aria-hidden': 'true'
-		});
-		var pathLine = svgNode('polyline', {
-			fill: 'rgba(255,255,255,0.06)',
-			stroke: '#ffffff',
-			'stroke-width': '2',
-			'stroke-linejoin': 'round',
-			'stroke-linecap': 'round'
-		});
-		pathSvg.appendChild(pathLine);
 		box.hidden = true;
 		size.hidden = true;
-		pathSvg.hidden = true;
 
-		var bar = element('div', { className: 'stillframe-snip__bar' });
+		var bar = element('div', { className: 'stillframe-snip__bar', role: 'toolbar', 'aria-label': text('heading') || 'Capture this screen' });
+		var hint = element('div', { className: 'stillframe-snip__hint', role: 'status' });
 		var mode = 'rect';
-		var rectButton = iconButton(text('snipRect') || 'Rectangular snip', function (svg) {
-			svg.appendChild(svgNode('rect', {
-				x: '4',
-				y: '6',
-				width: '16',
-				height: '12',
-				rx: '2',
-				fill: 'none',
-				stroke: 'currentColor',
-				'stroke-width': '1.8'
-			}));
-		});
-		var freeButton = iconButton(text('snipFree') || 'Freeform snip', function (svg) {
-			svg.appendChild(svgNode('path', {
-				d: 'M4 17c2.2-7 3.2-1.5 5.4-6.2 1.6-3.4 2.4 4.8 4.6 1.6 1.8-2.6 2.6-5.4 6-3.2',
-				fill: 'none',
-				stroke: 'currentColor',
-				'stroke-width': '1.8',
-				'stroke-linecap': 'round'
-			}));
-		});
-		var windowModeButton = iconButton(text('snipWindow') || 'Window snip', function (svg) {
-			svg.appendChild(svgNode('rect', {
-				x: '3',
-				y: '5',
-				width: '12',
-				height: '9',
-				rx: '1.5',
-				fill: 'none',
-				stroke: 'currentColor',
-				'stroke-width': '1.8'
-			}));
-			svg.appendChild(svgNode('rect', {
-				x: '8',
-				y: '10',
-				width: '12',
-				height: '9',
-				rx: '1.5',
-				fill: 'none',
-				stroke: 'currentColor',
-				'stroke-width': '1.8'
-			}));
-		});
-		var fullButton = iconButton(text('snipFull') || 'Fullscreen', function (svg) {
-			svg.appendChild(svgNode('path', {
-				d: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
-				fill: 'none',
-				stroke: 'currentColor',
-				'stroke-width': '1.8',
-				'stroke-linecap': 'round'
-			}));
-		});
+		var rectButton = iconButton('area', text('snipRect') || 'Area', '', true);
+		var windowModeButton = iconButton('window', text('snipWindow') || 'Window', '', true);
+		var fullButton = iconButton('full', text('snipFull') || 'Full screen', '', true);
 		var sep = element('span', { className: 'stillframe-snip__sep' });
 		sep.setAttribute('aria-hidden', 'true');
-		var cancelButton = iconButton(text('cancel') || 'Close', function (svg) {
-			svg.appendChild(svgNode('path', {
-				d: 'M6 6l12 12M18 6L6 18',
-				fill: 'none',
-				stroke: 'currentColor',
-				'stroke-width': '1.8',
-				'stroke-linecap': 'round'
-			}));
+		var cancelButton = iconButton('close', text('cancel') || 'Close', 'stillframe-snip__close', false, (text('cancel') || 'Close') + ' (Esc)');
+		[rectButton, windowModeButton, fullButton].forEach(function (button) {
+			button.classList.add('stillframe-snip__mode');
 		});
+
+		function setHint() {
+			hint.textContent = mode === 'window'
+				? (text('snipHintWindow') || 'Click a section of the page to capture it')
+				: (text('snipHint') || 'Drag to select an area');
+		}
 
 		function setMode(next) {
 			mode = next;
 			root.setAttribute('data-mode', next);
 			rectButton.setAttribute('aria-pressed', next === 'rect' ? 'true' : 'false');
-			freeButton.setAttribute('aria-pressed', next === 'freeform' ? 'true' : 'false');
 			windowModeButton.setAttribute('aria-pressed', next === 'window' ? 'true' : 'false');
 			fullButton.setAttribute('aria-pressed', 'false');
 			showSelection(null);
-			pathSvg.hidden = true;
-			pathLine.setAttribute('points', '');
+			setHint();
 		}
 
 		function stopBar(event) {
@@ -1559,18 +1832,12 @@
 		}
 
 		rectButton.setAttribute('aria-pressed', 'true');
-		freeButton.setAttribute('aria-pressed', 'false');
 		windowModeButton.setAttribute('aria-pressed', 'false');
+		fullButton.setAttribute('aria-pressed', 'false');
 		rectButton.addEventListener('click', function (event) {
 			stopBar(event);
 			if (!snipBusy) {
 				setMode('rect');
-			}
-		});
-		freeButton.addEventListener('click', function (event) {
-			stopBar(event);
-			if (!snipBusy) {
-				setMode('freeform');
 			}
 		});
 		windowModeButton.addEventListener('click', function (event) {
@@ -1597,22 +1864,19 @@
 			cancelSnip();
 		});
 		bar.addEventListener('pointerdown', stopBar);
+		hint.addEventListener('pointerdown', stopBar);
 		bar.appendChild(rectButton);
-		bar.appendChild(freeButton);
 		bar.appendChild(windowModeButton);
 		bar.appendChild(fullButton);
 		bar.appendChild(sep);
 		bar.appendChild(cancelButton);
+		setHint();
 
-		root.appendChild(dimT);
-		root.appendChild(dimL);
-		root.appendChild(dimR);
-		root.appendChild(dimB);
 		root.appendChild(shade);
 		root.appendChild(box);
 		root.appendChild(size);
-		root.appendChild(pathSvg);
 		root.appendChild(bar);
+		root.appendChild(hint);
 		if (document.getElementById('wpadminbar')) {
 			root.classList.add('has-admin-bar');
 		}
@@ -1623,44 +1887,45 @@
 		var moveEvent = null;
 		var moveFrame = 0;
 		var hoverFrame = 0;
+		var restartTimer = 0;
 
-		function layoutDims(rect) {
-			var vw = window.innerWidth || 0;
-			var vh = window.innerHeight || 0;
-			if (!rect) {
-				dimT.style.cssText = 'left:0;top:0;width:' + vw + 'px;height:' + vh + 'px;';
-				dimL.style.cssText = 'width:0;height:0;';
-				dimR.style.cssText = 'width:0;height:0;';
-				dimB.style.cssText = 'width:0;height:0;';
-				return;
-			}
-			var x = rect.x;
-			var y = rect.y;
-			var w = rect.width;
-			var h = rect.height;
-			dimT.style.cssText = 'left:0;top:0;width:' + vw + 'px;height:' + y + 'px;';
-			dimL.style.cssText = 'left:0;top:' + y + 'px;width:' + x + 'px;height:' + h + 'px;';
-			dimR.style.cssText = 'left:' + (x + w) + 'px;top:' + y + 'px;width:' + Math.max(0, vw - x - w) + 'px;height:' + h + 'px;';
-			dimB.style.cssText = 'left:0;top:' + (y + h) + 'px;width:' + vw + 'px;height:' + Math.max(0, vh - y - h) + 'px;';
+		// Rendering the page is heavy main-thread work. Only start it when the
+		// pointer has been idle, so it never competes with a drag or a mode switch.
+		function scheduleShot(delay) {
+			window.clearTimeout(restartTimer);
+			restartTimer = window.setTimeout(function () {
+				if (!snip || snipBusy || viewShot.canvas || viewShot.work) {
+					return;
+				}
+				if (drag) {
+					scheduleShot(300);
+					return;
+				}
+				startViewShot().catch(function () {
+					return null;
+				});
+			}, delay);
 		}
 
 		function showSelection(rect) {
 			if (!rect || rect.width < 1 || rect.height < 1) {
 				box.hidden = true;
 				size.hidden = true;
-				layoutDims(null);
+				hint.hidden = false;
+				root.classList.remove('is-selecting');
 				return;
 			}
 			box.hidden = false;
 			size.hidden = false;
-			layoutDims(rect);
+			hint.hidden = true;
+			root.classList.add('is-selecting');
 			box.style.transform = 'translate3d(' + rect.x + 'px,' + rect.y + 'px,0)';
 			box.style.width = rect.width + 'px';
 			box.style.height = rect.height + 'px';
-			size.textContent = Math.round(rect.width) + ' \u00d7 ' + Math.round(rect.height);
-			var top = rect.y + rect.height + 8;
-			if (top > window.innerHeight - 24) {
-				top = Math.max(8, rect.y - 24);
+			size.textContent = Math.round(rect.width) + ' × ' + Math.round(rect.height);
+			var top = rect.y + rect.height + 10;
+			if (top > window.innerHeight - 32) {
+				top = Math.max(8, rect.y - 32);
 			}
 			size.style.transform = 'translate3d(' + Math.max(8, rect.x) + 'px,' + top + 'px,0)';
 		}
@@ -1704,36 +1969,6 @@
 			};
 		}
 
-		function pathBounds(points) {
-			var i;
-			var minX = points[0];
-			var minY = points[1];
-			var maxX = points[0];
-			var maxY = points[1];
-			for (i = 2; i < points.length; i += 2) {
-				if (points[i] < minX) {
-					minX = points[i];
-				}
-				if (points[i] > maxX) {
-					maxX = points[i];
-				}
-				if (points[i + 1] < minY) {
-					minY = points[i + 1];
-				}
-				if (points[i + 1] > maxY) {
-					maxY = points[i + 1];
-				}
-			}
-			return {
-				x: minX,
-				y: minY,
-				width: maxX - minX,
-				height: maxY - minY
-			};
-		}
-
-		layoutDims(null);
-
 		shade.addEventListener('pointerdown', function (event) {
 			if (snipBusy || event.button !== 0) {
 				return;
@@ -1747,14 +1982,8 @@
 			drag = {
 				id: event.pointerId,
 				x: event.clientX,
-				y: event.clientY,
-				points: mode === 'freeform' ? [event.clientX, event.clientY] : null
+				y: event.clientY
 			};
-			if (mode === 'freeform') {
-				pathSvg.setAttribute('viewBox', '0 0 ' + (window.innerWidth || 0) + ' ' + (window.innerHeight || 0));
-				pathSvg.hidden = false;
-				pathLine.setAttribute('points', event.clientX + ',' + event.clientY);
-			}
 			showSelection(normalizeRect(drag.x, drag.y, event.clientX, event.clientY));
 		});
 		shade.addEventListener('pointermove', function (event) {
@@ -1784,17 +2013,6 @@
 				if (!drag || !moveEvent) {
 					return;
 				}
-				if (drag.points) {
-					drag.points.push(moveEvent.clientX, moveEvent.clientY);
-					var packed = '';
-					var i;
-					for (i = 0; i < drag.points.length; i += 2) {
-						packed += drag.points[i] + ',' + drag.points[i + 1] + ' ';
-					}
-					pathLine.setAttribute('points', packed);
-					showSelection(pathBounds(drag.points));
-					return;
-				}
 				showSelection(normalizeRect(drag.x, drag.y, moveEvent.clientX, moveEvent.clientY));
 			});
 		});
@@ -1802,18 +2020,11 @@
 			if (!drag || drag.id !== event.pointerId) {
 				return;
 			}
-			var rect;
-			if (drag.points && drag.points.length >= 4) {
-				rect = pathBounds(drag.points);
-			} else {
-				rect = normalizeRect(drag.x, drag.y, event.clientX, event.clientY);
-			}
+			var rect = normalizeRect(drag.x, drag.y, event.clientX, event.clientY);
 			drag = null;
 			moveEvent = null;
 			if (rect.width < 8 || rect.height < 8) {
 				showSelection(null);
-				pathSvg.hidden = true;
-				pathLine.setAttribute('points', '');
 				return;
 			}
 			captureRect(rect);
@@ -1825,8 +2036,6 @@
 			drag = null;
 			moveEvent = null;
 			showSelection(null);
-			pathSvg.hidden = true;
-			pathLine.setAttribute('points', '');
 		});
 
 		snipKeyHandler = function (event) {
@@ -1838,6 +2047,22 @@
 			cancelSnip();
 		};
 		document.addEventListener('keydown', snipKeyHandler, true);
+
+		function onViewChange() {
+			invalidateViewShot();
+			scheduleShot(300);
+		}
+		window.addEventListener('scroll', onViewChange, true);
+		window.addEventListener('resize', onViewChange);
+		snipCleanup = function () {
+			window.clearTimeout(restartTimer);
+			window.removeEventListener('scroll', onViewChange, true);
+			window.removeEventListener('resize', onViewChange);
+		};
+
+		// Render the page in the background while the user chooses, so the
+		// selection can be cropped from a ready image the moment they let go.
+		scheduleShot(350);
 	}
 
 	function captureInFrame(url, width, scale, isCancelled) {
@@ -2112,8 +2337,8 @@
 		if (mediaButton) {
 			mediaButton.disabled = true;
 		}
-		setStatus(text('savingMedia'));
-		editor.flatten().then(function (blob) {
+		setStatus(text('savingMedia'), '', '', 'busy');
+		exportBlob().then(function (blob) {
 			var body = new FormData();
 			body.append('action', 'stillframe_save_media');
 			body.append('nonce', String(config.mediaNonce));
@@ -2139,10 +2364,10 @@
 			}
 			var data = result && result.payload && result.payload.data ? result.payload.data : null;
 			if (!result || !result.ok || !result.payload || !result.payload.success) {
-				setStatus(text('mediaFailed'));
+				setStatus(text('mediaFailed'), '', '', 'error');
 				return;
 			}
-			setStatus(text('savedMedia'), data && data.editUrl ? String(data.editUrl) : '', text('viewMedia'));
+			setStatus(text('savedMedia'), data && data.editUrl ? String(data.editUrl) : '', text('viewMedia'), 'success');
 		}).catch(function () {
 			if (!panel) {
 				return;
@@ -2150,7 +2375,7 @@
 			if (mediaButton) {
 				mediaButton.disabled = false;
 			}
-			setStatus(text('mediaFailed'));
+			setStatus(text('mediaFailed'), '', '', 'error');
 		});
 	}
 
@@ -2296,7 +2521,7 @@
 			}
 			downloadButton.disabled = true;
 			setStatus(text('preparing'));
-			editor.flatten().then(function (blob) {
+			exportBlob().then(function (blob) {
 				saveBlob(blob, fileNameFor(captured.url, captured.width, captured.scale));
 				if (!panel) {
 					return;
@@ -2436,6 +2661,12 @@
 		}
 		captured = null;
 		compactPanel = false;
+		resultReady = false;
+		pendingAction = '';
+		if (resultObserver) {
+			resultObserver.disconnect();
+			resultObserver = null;
+		}
 		invalidateViewShot();
 		if (keyHandler) {
 			document.removeEventListener('keydown', keyHandler, true);

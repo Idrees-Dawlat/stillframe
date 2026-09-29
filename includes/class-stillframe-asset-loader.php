@@ -102,7 +102,7 @@ class Stillframe_Asset_Loader {
 		 * Fires when Stillframe has prepared the capture panel for an administrator.
 		 *
 		 * The panel markup is built in the browser after the admin bar item is opened.
-		 * Version 0.1.0 does not print the panel from PHP.
+		 * Stillframe does not print the panel from PHP.
 		 */
 		do_action( 'stillframe_capture_panel_rendered' );
 	}
@@ -132,7 +132,8 @@ class Stillframe_Asset_Loader {
 			return false;
 		}
 
-		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		// Read-only screen check; nothing is changed by this request.
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		return 'stillframe' === $page;
 	}
 
@@ -247,60 +248,65 @@ class Stillframe_Asset_Loader {
 	}
 
 	/**
-	 * Strings for the capture panel. They are inserted with textContent in the browser.
+	 * Strings for the capture panel. They are inserted with textContent in the browser, so they are not HTML-escaped here.
 	 *
 	 * @return array<string, string>
 	 */
 	private function script_strings() {
 		return array(
-			'heading'         => esc_html__( 'Capture this screen', 'stillframe' ),
-			'close'           => esc_html__( 'Close', 'stillframe' ),
-			'screen'          => esc_html__( 'This screen', 'stillframe' ),
-			'width'           => esc_html__( 'Width', 'stillframe' ),
-			'custom'          => esc_html__( 'Custom', 'stillframe' ),
-			'customWidth'     => esc_html__( 'Custom width', 'stillframe' ),
-			'scale'           => esc_html__( 'Export scale', 'stillframe' ),
-			'capture'         => esc_html__( 'Capture', 'stillframe' ),
-			'captureWindow'   => esc_html__( 'Capture current window', 'stillframe' ),
-			'capturingWidth'  => esc_html__( 'Reloading this page at the chosen width.', 'stillframe' ),
-			'download'        => esc_html__( 'Download', 'stillframe' ),
-			'saveMedia'       => esc_html__( 'Save to Media', 'stillframe' ),
-			'savingMedia'     => esc_html__( 'Saving to the Media Library.', 'stillframe' ),
-			'savedMedia'      => esc_html__( 'Saved to the Media Library.', 'stillframe' ),
-			'viewMedia'       => esc_html__( 'View', 'stillframe' ),
-			'mediaFailed'     => esc_html__( 'The media save failed. The page was not changed.', 'stillframe' ),
-			'pen'             => esc_html__( 'Pen', 'stillframe' ),
-			'circle'          => esc_html__( 'Circle', 'stillframe' ),
-			'arrow'           => esc_html__( 'Arrow', 'stillframe' ),
-			'undo'            => esc_html__( 'Undo', 'stillframe' ),
-			'clear'           => esc_html__( 'Clear', 'stillframe' ),
-			'tools'           => esc_html__( 'Annotation tools', 'stillframe' ),
-			'capturedAlt'     => esc_html__( 'Captured screen', 'stillframe' ),
-			'frameTitle'      => esc_html__( 'Stillframe capture frame', 'stillframe' ),
-			'capturing'       => esc_html__( 'Capturing this screen.', 'stillframe' ),
+			'heading'         => __( 'Capture this screen', 'stillframe' ),
+			'close'           => __( 'Close', 'stillframe' ),
+			'screen'          => __( 'This screen', 'stillframe' ),
+			'width'           => __( 'Width', 'stillframe' ),
+			'custom'          => __( 'Custom', 'stillframe' ),
+			'customWidth'     => __( 'Custom width', 'stillframe' ),
+			'scale'           => __( 'Export scale', 'stillframe' ),
+			'capture'         => __( 'Capture', 'stillframe' ),
+			'captureWindow'   => __( 'Capture current window', 'stillframe' ),
+			'capturingWidth'  => __( 'Reloading this page at the chosen width.', 'stillframe' ),
+			'download'        => __( 'Download', 'stillframe' ),
+			'saveMedia'       => __( 'Save to Media', 'stillframe' ),
+			'savingMedia'     => __( 'Saving to the Media Library.', 'stillframe' ),
+			'savedMedia'      => __( 'Saved to Media', 'stillframe' ),
+			'viewMedia'       => __( 'View in Media', 'stillframe' ),
+			'mediaFailed'     => __( 'The media save failed. The page was not changed.', 'stillframe' ),
+			'pen'             => __( 'Pen', 'stillframe' ),
+			'circle'          => __( 'Circle', 'stillframe' ),
+			'arrow'           => __( 'Arrow', 'stillframe' ),
+			'undo'            => __( 'Undo', 'stillframe' ),
+			'clear'           => __( 'Clear', 'stillframe' ),
+			'tools'           => __( 'Annotation tools', 'stillframe' ),
+			'capturedAlt'     => __( 'Captured screen', 'stillframe' ),
+			'frameTitle'      => __( 'Stillframe capture frame', 'stillframe' ),
+			'capturing'       => __( 'Capturing this screen.', 'stillframe' ),
 			/* translators: 1: width in CSS pixels, 2: export scale. */
-			'captured'        => esc_html__( 'Captured at %1$d pixels wide and %2$dx. Draw on the picture, then download the PNG.', 'stillframe' ),
-			'preparing'       => esc_html__( 'Preparing the PNG.', 'stillframe' ),
-			'assetsFailed'    => esc_html__( 'Stillframe could not load the capture tools. The page was not changed.', 'stillframe' ),
-			'captureFailed'   => esc_html__( 'The capture failed. The page was not changed.', 'stillframe' ),
-			'captureTimeout'  => esc_html__( 'The capture timed out. The page was not changed.', 'stillframe' ),
-			'frameBlocked'    => esc_html__( 'The frame was blocked, so only the current window can be captured. The page was not changed.', 'stillframe' ),
-			'invalidWidth'    => esc_html__( 'Enter a whole number from 320 to 2560. The page was not changed.', 'stillframe' ),
-			'downloadFailed'  => esc_html__( 'The download failed. The page was not changed.', 'stillframe' ),
-			'libraryMissing'  => esc_html__( 'The capture tool did not load. The page was not changed.', 'stillframe' ),
-			'snipHint'        => esc_html__( 'Drag to select', 'stillframe' ),
-			'snipRect'        => esc_html__( 'Rectangular snip', 'stillframe' ),
-			'snipFree'        => esc_html__( 'Freeform snip', 'stillframe' ),
-			'snipWindow'      => esc_html__( 'Window snip', 'stillframe' ),
-			'snipFull'        => esc_html__( 'Fullscreen', 'stillframe' ),
-			'topBar'          => esc_html__( 'Top bar', 'stillframe' ),
-			'sideMenu'        => esc_html__( 'Side menu', 'stillframe' ),
-			'pluginsClean'    => esc_html__( 'Hide other plugins', 'stillframe' ),
-			'notices'         => esc_html__( 'Admin notices', 'stillframe' ),
-			'cancel'          => esc_html__( 'Cancel', 'stillframe' ),
-			'more'            => esc_html__( 'More', 'stillframe' ),
-			'topBarHelp'      => esc_html__( 'Include the top bar', 'stillframe' ),
-			'sideMenuHelp'    => esc_html__( 'Include the side menu', 'stillframe' ),
+			'captured'        => __( 'Captured at %1$d pixels wide and %2$dx. Draw on the picture, then download the PNG.', 'stillframe' ),
+			'preparing'       => __( 'Preparing the PNG.', 'stillframe' ),
+			'assetsFailed'    => __( 'Stillframe could not load the capture tools. The page was not changed.', 'stillframe' ),
+			'captureFailed'   => __( 'The capture failed. The page was not changed.', 'stillframe' ),
+			'captureTimeout'  => __( 'The capture timed out. The page was not changed.', 'stillframe' ),
+			'frameBlocked'    => __( 'The frame was blocked, so only the current window can be captured. The page was not changed.', 'stillframe' ),
+			'invalidWidth'    => __( 'Enter a whole number from 320 to 2560. The page was not changed.', 'stillframe' ),
+			'downloadFailed'  => __( 'The download failed. The page was not changed.', 'stillframe' ),
+			'libraryMissing'  => __( 'The capture tool did not load. The page was not changed.', 'stillframe' ),
+			'snipHint'        => __( 'Drag to select an area', 'stillframe' ),
+			'snipHintWindow'  => __( 'Click a section of the page to capture it', 'stillframe' ),
+			'snipRect'        => __( 'Area', 'stillframe' ),
+			'snipWindow'      => __( 'Window', 'stillframe' ),
+			'snipFull'        => __( 'Full screen', 'stillframe' ),
+			'capturingShort'  => __( 'Capturing…', 'stillframe' ),
+			'queued'          => __( 'Almost there. This will finish as soon as the capture is ready.', 'stillframe' ),
+			'downloaded'      => __( 'Downloaded.', 'stillframe' ),
+			'colors'          => __( 'Color', 'stillframe' ),
+			'thickness'       => __( 'Line thickness', 'stillframe' ),
+			'topBar'          => __( 'Top bar', 'stillframe' ),
+			'sideMenu'        => __( 'Side menu', 'stillframe' ),
+			'pluginsClean'    => __( 'Hide other plugins', 'stillframe' ),
+			'notices'         => __( 'Admin notices', 'stillframe' ),
+			'cancel'          => __( 'Cancel', 'stillframe' ),
+			'more'            => __( 'More', 'stillframe' ),
+			'topBarHelp'      => __( 'Include the top bar', 'stillframe' ),
+			'sideMenuHelp'    => __( 'Include the side menu', 'stillframe' ),
 		);
 	}
 
@@ -310,7 +316,7 @@ class Stillframe_Asset_Loader {
 	 * @return string
 	 */
 	private function admin_bar_css() {
-		return '#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:hover,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:focus{outline:none;box-shadow:none;border:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon{margin-right:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon:before{content:"\\f306";top:2px;}#wpadminbar #wp-admin-bar-stillframe-capture .screen-reader-text{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}.stillframe-snip{position:fixed;inset:0;z-index:1000000;margin:0}.stillframe-snip__shade{position:absolute;inset:0;cursor:crosshair;background:rgba(0,0,0,.55)}.stillframe-snip__bar{position:fixed;top:12px;left:50%;z-index:6;display:flex;align-items:center;padding:4px;background:#2b2b2b;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);transform:translateX(-50%)}.stillframe-snip.has-admin-bar .stillframe-snip__bar{top:44px}.stillframe-snip__bar button{width:40px;height:40px;margin:0;padding:0;color:#f3f3f3;background:transparent;border:0;border-radius:6px}.stillframe-snip__bar button[aria-pressed="true"]{background:#3f3f3f;box-shadow:inset 0 0 0 1px #9cd1e8}.stillframe-snip__sep{width:1px;height:22px;margin:0 6px;background:#555}';
+		return '#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:hover,#wpadminbar #wp-admin-bar-stillframe-capture>.ab-item:focus{outline:none;box-shadow:none;border:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon{margin-right:0;}#wpadminbar #wp-admin-bar-stillframe-capture .ab-icon:before{content:"\\f306";top:2px;}#wpadminbar #wp-admin-bar-stillframe-capture .screen-reader-text{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}.stillframe-snip{position:fixed;inset:0;z-index:1000000;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;line-height:1.4}.stillframe-snip *{box-sizing:border-box}.stillframe-snip__shade{position:absolute;inset:0;cursor:crosshair;background:rgba(0,40,54,.5)}.stillframe-snip__bar{position:fixed;top:16px;left:0;right:0;z-index:6;display:flex;align-items:center;gap:2px;width:max-content;max-width:calc(100vw - 16px);margin:0 auto;padding:5px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.22),0 1px 2px rgba(15,23,42,.1)}.stillframe-snip.has-admin-bar .stillframe-snip__bar{top:48px}.stillframe-snip--boot .stillframe-snip__bar button{pointer-events:none}.stillframe-snip__bar button{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;min-width:36px;margin:0;padding:0 13px;color:#374151;font:inherit;font-size:13px;font-weight:600;line-height:1;white-space:nowrap;background:transparent;border:1px solid transparent;border-radius:8px}.stillframe-snip__bar button[aria-pressed="true"]{color:#005976;background:#e6f4f8;border-color:#b8dde8}.stillframe-snip__bar svg{display:block;flex:0 0 auto}.stillframe-snip__bar .stillframe-snip__close{width:36px;padding:0;color:#6b7280}.stillframe-snip__sep{width:1px;height:20px;margin:0 5px;background:#e5e7eb}.stillframe-snip__hint{position:fixed;top:72px;left:0;right:0;z-index:6;width:max-content;max-width:calc(100vw - 16px);margin:0 auto;padding:6px 12px;color:#374151;font-size:12.5px;font-weight:600;white-space:nowrap;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 14px rgba(15,23,42,.18)}.stillframe-snip.has-admin-bar .stillframe-snip__hint{top:104px}@media(max-width:560px){.stillframe-btn__label{display:none}.stillframe-snip__bar button{padding:0 10px}}';
 	}
 
 	/**

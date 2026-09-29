@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Stillframe
+ * Plugin Name: Stillframe – Screenshot Capture & Markup
  * Description: Drag a region of the screen you are looking at, mark it up, then download a PNG or save it to the Media Library.
- * Version: 0.1.3
+ * Version: 0.1.7
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Author: Grafucci
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STILLFRAME_VERSION', '0.1.3' );
+define( 'STILLFRAME_VERSION', '0.1.7' );
 define( 'STILLFRAME_FILE', __FILE__ );
 define( 'STILLFRAME_DIR', plugin_dir_path( __FILE__ ) );
 

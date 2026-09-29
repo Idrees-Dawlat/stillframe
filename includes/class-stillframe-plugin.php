@@ -58,25 +58,11 @@ class Stillframe_Plugin {
 	 * @return void
 	 */
 	public function init() {
-		add_action( 'init', array( $this, 'load_textdomain' ) );
 		$this->media->register();
 		$this->tools->register();
 		add_action( 'admin_bar_menu', array( $this->menu, 'register' ), 100 );
 		add_action( 'wp_enqueue_scripts', array( $this->assets, 'enqueue' ) );
 		add_action( 'admin_enqueue_scripts', array( $this->assets, 'enqueue' ) );
-	}
-
-	/**
-	 * Load translations from the plugin languages directory.
-	 *
-	 * @return void
-	 */
-	public function load_textdomain() {
-		load_plugin_textdomain(
-			'stillframe',
-			false,
-			dirname( plugin_basename( STILLFRAME_FILE ) ) . '/languages'
-		);
 	}
 }
 

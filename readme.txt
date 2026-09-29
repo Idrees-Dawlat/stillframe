@@ -1,9 +1,9 @@
-=== Stillframe ===
+=== Stillframe – Screenshot Capture & Markup ===
 Contributors: grafucci
-Tags: screenshot, capture, annotation, png, design
+Tags: screenshot, capture, annotate, media library, png
 Requires at least: 6.4
 Tested up to: 7.1.2
-Stable tag: 0.1.3
+Stable tag: 0.1.7
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -22,7 +22,6 @@ The downloaded file is named `stillframe-{slug}-{width}w-{scale}x.png`. The slug
 
 Stillframe does not save the picture on the site, does not add a settings screen, and does not load for logged-out visitors. If the page refuses to be framed, Stillframe says so and can capture the current window only. It does not retry with a workaround. If capture fails, the page is left as it was.
 
-Author: Grafucci
 
 == Installation ==
 
@@ -52,11 +51,31 @@ A cross-origin image may be omitted. Stillframe does not proxy images through PH
 
 Tools, then Stillframe, starts a capture. Width, scale, the top bar, the side menu, and which plugins stay visible are chosen each time. Those choices are remembered in the browser. Stillframe does not write plugin settings to the database.
 
-== Screenshots ==
+== Third-party code ==
 
-This version does not ship screenshot images.
+Stillframe bundles modern-screenshot 4.7.0 (MIT license) as `assets/js/vendor/modern-screenshot.js`. Source: https://github.com/qq15725/modern-screenshot. The license text is in `assets/js/vendor/LICENSE-modern-screenshot.txt`. It runs in the browser and sends nothing to any outside service.
 
 == Changelog ==
+
+= 0.1.7 =
+* Readme, translation and code-standards cleanup for the WordPress.org review
+
+= 0.1.6 =
+* Fixed the Area, Window and Full screen buttons not responding
+* Snip overlay, hint and selection now use the Grafucci teal and white look
+* Saving to Media and downloading now show a clear floating notice with a View in Media button
+
+= 0.1.5 =
+* Toolbar no longer jumps from the right to the center when it opens
+* Smoother area dragging: one dim layer instead of four, and the page render waits until the pointer is idle
+* Restyled to the Grafucci look: light surfaces and brand teal, no purple
+
+= 0.1.4 =
+* Redesigned capture toolbar with Area, Window and Full screen; the freeform snip is gone
+* The result window opens the moment you finish selecting, with Download and Save to Media ready. The page is rendered in the background while you choose, and a click before it is ready finishes automatically
+* Downloading or saving an unmarked capture no longer re-renders it
+* Fixed scrolled and full screen captures: plugin icon fonts and images now render, fixed elements such as the top bar and side menu stay in place, and the layout no longer shifts
+* New markup tools: color palette, three line thicknesses, smoother pen, a cleaner arrow, Shift to draw circles and 45 degree arrows, keyboard shortcuts (P, C, A, Ctrl+Z)
 
 = 0.1.3 =
 * Match the capture overlay to the Windows snipping toolbar
