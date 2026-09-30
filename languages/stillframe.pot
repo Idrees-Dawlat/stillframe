@@ -27,7 +27,7 @@ msgstr ""
 
 #. Author of the plugin
 #: stillframe.php
-msgid "Grafucci"
+msgid "Idrees Dawlat"
 msgstr ""
 
 #: includes/class-stillframe-admin-bar-menu.php:36

@@ -59,13 +59,13 @@ Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/mod
 
 = 0.1.6 =
 * Fixed the Area, Window and Full screen buttons not responding
-* Snip overlay, hint and selection now use the Grafucci teal and white look
+* Snip overlay, hint and selection now use the brand teal and white look
 * Saving to Media and downloading now show a clear floating notice with a View in Media button
 
 = 0.1.5 =
 * Toolbar no longer jumps from the right to the center when it opens
 * Smoother area dragging: one dim layer instead of four, and the page render waits until the pointer is idle
-* Restyled to the Grafucci look: light surfaces and brand teal, no purple
+* Restyled to light surfaces and brand teal, no purple
 
 = 0.1.4 =
 * Redesigned capture toolbar with Area, Window and Full screen; the freeform snip is gone
