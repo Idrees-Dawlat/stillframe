@@ -27,6 +27,12 @@ Stillframe runs entirely in your browser. It does not send any data to external 
 3. Activate the plugin.
 4. Click the camera icon in the top admin bar, or go to Tools > Stillframe to start capturing.
 
+== Screenshots ==
+
+1. Launch Stillframe from the admin bar to select Area, Window, or Full screen capture.
+2. Drag and resize your capture region with pixel dimensions.
+3. Annotate your screenshot with pen, circle, arrow tools, and save to Media Library or download.
+
 == Frequently Asked Questions ==
 
 = Who can use Stillframe? =
