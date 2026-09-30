@@ -3,7 +3,7 @@ Contributors: idreesdawlat
 Tags: screenshot, capture, annotate, media library, png
 Requires at least: 6.4
 Tested up to: 7.1
-Stable tag: 0.1.7
+Stable tag: 0.1.8
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -56,6 +56,14 @@ Stillframe is open-source software. You can view the source code, contribute, or
 Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/modern-screenshot.js. Source: https://github.com/qq15725/modern-screenshot. The license text is in assets/js/vendor/LICENSE-modern-screenshot.txt.
 
 == Changelog ==
+
+= 0.1.8 =
+* Refined selection tool with clean native white UI, crisp line edge handles, and square corner anchors
+* Selection dimensions are cleanly integrated into the floating actions bar
+* Window mode now highlights and selects the element first, allowing precision resizing before capture
+* Prevented accidental double-click captures: capture only triggers via the Capture button or Enter key
+* Prevent background page scrolling while the capture tool or preview modal is open
+* Clicking outside the preview modal on the backdrop overlay now cleanly closes it
 
 = 0.1.7 =
 * New: after dragging, move or resize the selection with handles, then press Enter or choose Capture

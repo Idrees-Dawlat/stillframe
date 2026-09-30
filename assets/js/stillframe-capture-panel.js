@@ -70,6 +70,18 @@
 			.replace(/&amp;/g, '&');
 	}
 
+	function lockScroll() {
+		document.documentElement.classList.add('stillframe-locked');
+		document.body.classList.add('stillframe-locked');
+	}
+
+	function unlockScroll() {
+		if (!snip && !panel) {
+			document.documentElement.classList.remove('stillframe-locked');
+			document.body.classList.remove('stillframe-locked');
+		}
+	}
+
 	function element(tag, attrs) {
 		var node = document.createElement(tag);
 		if (!attrs) {
@@ -986,6 +998,7 @@
 		if (boot && boot.parentNode) {
 			boot.parentNode.removeChild(boot);
 		}
+		unlockScroll();
 	}
 
 	function cancelSnip() {
@@ -1372,8 +1385,8 @@
 			return;
 		}
 		var scale = captured && captured.scale ? captured.scale : 1;
-		var availW = Math.max(60, stage.clientWidth - 48);
-		var availH = Math.max(60, stage.clientHeight - 48);
+		var availW = Math.max(60, stage.clientWidth - 16);
+		var availH = Math.max(60, stage.clientHeight - 16);
 		var w = image.naturalWidth / scale;
 		var h = image.naturalHeight / scale;
 		var ratio = Math.min(1, availW / w, availH / h);
@@ -1435,6 +1448,13 @@
 		],
 		close: [
 			{ d: 'M6 6l12 12M18 6L6 18' }
+		],
+		check: [
+			{ d: 'M20 6L9 17l-5-5' }
+		],
+		camera: [
+			{ tag: 'path', d: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z' },
+			{ tag: 'circle', cx: '12', cy: '13', r: '4' }
 		],
 		pen: [
 			{ d: 'M4 20l1-4.2L16.6 4.2a2.1 2.1 0 0 1 3 3L8.2 19 4 20z' },
@@ -1547,7 +1567,7 @@
 		brand.appendChild(element('span', { className: 'stillframe-result__name', text: 'Stillframe' }));
 		brand.appendChild(element('span', {
 			className: 'stillframe-result__dims',
-			text: captured.width + ' × ' + captured.height
+			text: Math.round(captured.width).toLocaleString() + ' × ' + Math.round(captured.height).toLocaleString()
 		}));
 
 		var markGroup = element('div', {
@@ -1698,6 +1718,13 @@
 		win.appendChild(statusNode);
 		root.appendChild(win);
 
+		root.addEventListener('pointerdown', function (event) {
+			if (event.target === root) {
+				api.closePanel();
+			}
+		});
+
+		lockScroll();
 		panel = root;
 		dialog = win;
 		keyHandler = function (event) {
@@ -1823,12 +1850,30 @@
 		});
 		var actions = element('div', { className: 'stillframe-snip__actions', role: 'toolbar' });
 		var dims = element('span', { className: 'stillframe-snip__dims' });
-		var goButton = element('button', { type: 'button', className: 'stillframe-snip__go', text: text('capture') || 'Capture', title: (text('capture') || 'Capture') + ' (Enter)' });
-		var resetButton = element('button', { type: 'button', className: 'stillframe-snip__reset', text: text('cancel') || 'Cancel', title: (text('cancel') || 'Cancel') + ' (Esc)' });
+		var actionsSep = element('span', { className: 'stillframe-snip__actions-sep' });
+		actionsSep.setAttribute('aria-hidden', 'true');
+		var resetButton = element('button', {
+			type: 'button',
+			className: 'stillframe-snip__reset',
+			'aria-label': (text('cancel') || 'Cancel') + ' (Esc)',
+			title: (text('cancel') || 'Cancel') + ' (Esc)'
+		});
+		resetButton.appendChild(iconSvg('close', 15));
+
+		var goButton = element('button', {
+			type: 'button',
+			className: 'stillframe-snip__go',
+			'aria-label': (text('capture') || 'Capture') + ' (Enter)',
+			title: (text('capture') || 'Capture') + ' (Enter)'
+		});
+		goButton.appendChild(iconSvg('check', 15));
+		goButton.appendChild(element('span', { text: text('capture') || 'Capture' }));
+
 		actions.hidden = true;
 		actions.appendChild(dims);
-		actions.appendChild(goButton);
+		actions.appendChild(actionsSep);
 		actions.appendChild(resetButton);
+		actions.appendChild(goButton);
 		var sel = null;
 		var adj = null;
 		var adjFrame = 0;
@@ -1920,6 +1965,7 @@
 			root.classList.add('has-admin-bar');
 		}
 		document.body.appendChild(root);
+		lockScroll();
 		snip = root;
 
 		var drag = null;
@@ -1955,10 +2001,11 @@
 		}
 
 		function positionActions(rect) {
-			var width = actions.offsetWidth || 200;
-			var top = rect.y + rect.height + 10;
-			if (top > window.innerHeight - 52) {
-				top = Math.max(8, rect.y - 50);
+			var width = actions.offsetWidth || 180;
+			var height = actions.offsetHeight || 38;
+			var top = rect.y + rect.height + 8;
+			if (top > window.innerHeight - height - 8) {
+				top = Math.max(8, rect.y - height - 8);
 			}
 			var left = Math.min(Math.max(8, rect.x + rect.width - width), Math.max(8, window.innerWidth - width - 8));
 			actions.style.transform = 'translate3d(' + left + 'px,' + top + 'px,0)';
@@ -1968,33 +2015,42 @@
 			if (!rect || rect.width < 1 || rect.height < 1) {
 				box.hidden = true;
 				size.hidden = true;
+				size.style.display = 'none';
 				actions.hidden = true;
+				actions.style.display = 'none';
 				box.classList.remove('is-adjusting');
 				hint.hidden = false;
 				root.classList.remove('is-selecting');
 				return;
 			}
 			box.hidden = false;
-			size.hidden = !!sel;
-			actions.hidden = !sel;
 			box.classList.toggle('is-adjusting', !!sel);
 			hint.hidden = true;
 			root.classList.add('is-selecting');
 			box.style.transform = 'translate3d(' + rect.x + 'px,' + rect.y + 'px,0)';
 			box.style.width = rect.width + 'px';
 			box.style.height = rect.height + 'px';
-			var label = Math.round(rect.width) + ' × ' + Math.round(rect.height);
+			var label = Math.round(rect.width).toLocaleString() + ' × ' + Math.round(rect.height).toLocaleString();
 			if (sel) {
+				size.hidden = true;
+				size.style.display = 'none';
+				actions.hidden = false;
+				actions.style.display = 'flex';
 				dims.textContent = label;
 				positionActions(rect);
 				return;
 			}
+			actions.hidden = true;
+			actions.style.display = 'none';
+			size.hidden = false;
+			size.style.display = 'inline-flex';
 			size.textContent = label;
-			var top = rect.y + rect.height + 10;
+			var top = rect.y + rect.height + 8;
 			if (top > window.innerHeight - 32) {
 				top = Math.max(8, rect.y - 32);
 			}
-			size.style.transform = 'translate3d(' + Math.max(8, rect.x) + 'px,' + top + 'px,0)';
+			var left = Math.min(Math.max(8, rect.x + (rect.width - 90) / 2), Math.max(8, window.innerWidth - 100));
+			size.style.transform = 'translate3d(' + left + 'px,' + top + 'px,0)';
 		}
 
 		function pickWindow(clientX, clientY) {
@@ -2043,7 +2099,12 @@
 			}
 			event.preventDefault();
 			if (mode === 'window') {
-				captureRect(rectFromNode(pickWindow(event.clientX, event.clientY)));
+				var targetRect = rectFromNode(pickWindow(event.clientX, event.clientY));
+				if (targetRect && targetRect.width >= 8 && targetRect.height >= 8) {
+					sel = targetRect;
+					showSelection(sel);
+					scheduleShot(IDLE_BEFORE_RENDER_MS);
+				}
 				return;
 			}
 			sel = null;
@@ -2057,14 +2118,14 @@
 		});
 		shade.addEventListener('pointermove', function (event) {
 			touch();
-			if (mode === 'window' && !drag && !snipBusy) {
+			if (mode === 'window' && !drag && !snipBusy && !sel) {
 				moveEvent = event;
 				if (hoverFrame) {
 					return;
 				}
 				hoverFrame = window.requestAnimationFrame(function () {
 					hoverFrame = 0;
-					if (mode !== 'window' || drag || snipBusy || !moveEvent) {
+					if (mode !== 'window' || drag || snipBusy || !moveEvent || sel) {
 						return;
 					}
 					showSelection(rectFromNode(pickWindow(moveEvent.clientX, moveEvent.clientY)));
@@ -2185,11 +2246,6 @@
 		}
 		box.addEventListener('pointerup', endAdjust);
 		box.addEventListener('pointercancel', endAdjust);
-		box.addEventListener('dblclick', function () {
-			if (sel && !snipBusy) {
-				captureRect(sel);
-			}
-		});
 		goButton.addEventListener('click', function (event) {
 			stopBar(event);
 			if (sel && !snipBusy) {
@@ -2879,6 +2935,7 @@
 		penButton = null;
 		editorSection = null;
 		canvasWrap = null;
+		unlockScroll();
 		focusMenu();
 	};
 
