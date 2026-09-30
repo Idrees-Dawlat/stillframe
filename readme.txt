@@ -1,5 +1,5 @@
 === Stillframe – Screenshot Capture & Markup ===
-Contributors: grafucci
+Contributors: idreesdawlat
 Tags: screenshot, capture, annotate, media library, png
 Requires at least: 6.4
 Tested up to: 7.1
@@ -8,52 +8,46 @@ Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Drag a region of the screen you are looking at, mark it up, then download a PNG or save it to the Media Library.
+Capture a screen region, draw on it, and download a PNG or save it to your Media Library.
 
 == Description ==
 
-Plugin and theme authors need a picture of the screen they are already looking at. Stillframe adds a camera icon in the top bar and a Stillframe page under Tools.
+Stillframe lets you take screenshots of your WordPress admin area or front-end pages directly inside the browser. It adds a camera icon to the top admin bar and a page under Tools.
 
-Drag a region, then move or resize it before you capture, or capture the full view. Phone, iPad, and Desktop are under Widths and reload the page at 390, 834, or 1440 pixels. You can include the top bar and the side menu, or hide other plugins so the shot looks like a fresh WordPress install. Draw on the picture, then download a PNG or save it to the Media Library.
+You can select a specific region of the screen, adjust the selection with handles, capture the full page, or capture the active window. You can also preview the page at standard screen widths (mobile, tablet, desktop) and hide admin menus or other plugins to get a clean shot.
 
-Export scale is 1x, 2x, or 3x. The default scale is 1x.
+After taking a screenshot, draw on it using the pen, circle, or arrow tools, choose colors and line weights, and export at 1x, 2x, or 3x scale. Images can be downloaded to your computer or saved straight into your WordPress Media Library.
 
-The downloaded file is named `stillframe-{slug}-{width}w-{scale}x.png`. The slug comes from the path. If the path has no letters or numbers, the name uses `screen`.
-
-Stillframe does not save the picture on the site, does not add a settings screen, and does not load for logged-out visitors. If the page refuses to be framed, Stillframe says so and can capture the current window only. It does not retry with a workaround. If capture fails, the page is left as it was.
-
+Stillframe runs entirely in your browser. It does not send any data to external servers, adds no settings pages to your database, and only loads for logged-in administrators.
 
 == Installation ==
 
-1. Upload the `stillframe` folder to `/wp-content/plugins/`, or install the zip through the Plugins screen.
-2. Activate Stillframe through the Plugins screen.
-3. Open a front-end page or a wp-admin screen while logged in as an administrator, and choose the camera icon in the top bar, or open Tools and then Stillframe.
+1. Go to Plugins > Add New in your WordPress dashboard.
+2. Search for Stillframe and click Install Now.
+3. Activate the plugin.
+4. Click the camera icon in the top admin bar, or go to Tools > Stillframe to start capturing.
 
 == Frequently Asked Questions ==
 
 = Who can use Stillframe? =
+Only logged-in users with the manage_options capability (administrators). Logged-out visitors do not load any scripts or CSS from this plugin.
 
-Only a logged-in user with the `manage_options` capability. Logged-out visitors receive no HTML, CSS, or JavaScript from this plugin.
+= Does Stillframe store images on my server? =
+Only if you click Save to Media, which adds one PNG to your Media Library. Downloading saves the image straight to your computer without saving anything to the site or database.
 
-= Does it store the PNG on the site? =
+= Does it send data to any outside service? =
+No. Rendering and markup happen completely in your browser.
 
-Only if you choose Save to Media. That stores one PNG in the Media Library. Download saves the file on your computer and does not write to the site. Stillframe does not write options, posts, tables, or transients.
+= Does Stillframe leave data in the database? =
+No. It does not write options, tables, or transients to your database.
 
-= What happens if the frame is blocked? =
+== Development ==
 
-The panel says the frame was blocked and that the page was not changed. You can capture the current window only. Stillframe does not try to bypass framing rules.
-
-= Will every image be in the PNG? =
-
-A cross-origin image may be omitted. Stillframe does not proxy images through PHP.
-
-= Is there a settings screen? =
-
-Tools, then Stillframe, starts a capture. Width, scale, the top bar, the side menu, and which plugins stay visible are chosen each time. Those choices are remembered in the browser. Stillframe does not write plugin settings to the database.
+Stillframe is open-source software. You can view the source code, contribute, or submit feedback on [GitHub](https://github.com/Idrees-Dawlat/stillframe).
 
 == Third-party code ==
 
-Stillframe bundles modern-screenshot 4.7.0 (MIT license) as `assets/js/vendor/modern-screenshot.js`. Source: https://github.com/qq15725/modern-screenshot. The license text is in `assets/js/vendor/LICENSE-modern-screenshot.txt`. It runs in the browser and sends nothing to any outside service.
+Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/modern-screenshot.js. Source: https://github.com/qq15725/modern-screenshot. The license text is in assets/js/vendor/LICENSE-modern-screenshot.txt.
 
 == Changelog ==
 

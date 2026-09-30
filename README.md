@@ -28,7 +28,7 @@ Tools, then Stillframe, starts a capture. The choices stay in the browser and ar
 
 ## Author
 
-Grafucci
+Idrees Dawlat (Grafucci)
 
 ## License
 
