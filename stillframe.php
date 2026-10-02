@@ -2,11 +2,11 @@
 /**
  * Plugin Name: Stillframe – Screenshot Capture & Markup
  * Plugin URI: https://grafucci.com/stillframe/
- * Description: Drag a region of the screen you are looking at, mark it up, then download a PNG or save it to the Media Library.
- * Version: 0.1.8
+ * Description: Capture multi-device screenshots (Desktop, Tablet, Mobile) or custom regions, mark them up with rich annotation tools, and export to PNG or Media Library.
+ * Version: 0.2.0
  * Requires at least: 6.4
  * Requires PHP: 7.4
- * Author: Idrees Dawlat
+ * Author: Grafucci
  * Author URI: https://grafucci.com/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'STILLFRAME_VERSION', '0.1.8' );
+define( 'STILLFRAME_VERSION', '0.2.0' );
 define( 'STILLFRAME_FILE', __FILE__ );
 define( 'STILLFRAME_DIR', plugin_dir_path( __FILE__ ) );
 

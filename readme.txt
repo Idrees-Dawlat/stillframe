@@ -1,37 +1,65 @@
 === Stillframe – Screenshot Capture & Markup ===
-Contributors: idreesdawlat
-Tags: screenshot, capture, annotate, media library, png
+Contributors: idreesdawlat, grafucci
+Tags: screenshot, capture, annotate, media library, responsive
 Requires at least: 6.4
 Tested up to: 7.1
-Stable tag: 0.1.8
+Stable tag: 0.2.0
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Capture a screen region, draw on it, and download a PNG or save it to your Media Library.
+Multi-device screenshot capture, responsive previews, and markup studio for WordPress.
 
 == Description ==
 
-Stillframe lets you take screenshots of your WordPress admin area or front-end pages directly inside the browser. It adds a camera icon to the top admin bar and a page under Tools.
+Stillframe lets you take screenshots of your WordPress admin area or front-end pages directly inside your browser. Capture responsive desktop, tablet, and mobile views, mark them up with rich annotation tools, and save them straight to your Media Library or download high-resolution PNGs.
 
-You can select a specific region of the screen, adjust the selection with handles, capture the full page, or capture the active window. You can also preview the page at standard screen widths (mobile, tablet, desktop) and hide admin menus or other plugins to get a clean shot.
+### Multi-Device Studio (Tools > Stillframe)
+* **Simultaneous Device Capture**: Capture Desktop (1440×900 px), iPad / Tablet (834×1112 px), and Mobile Phone (390×844 px) viewports in a single run.
+* **Target Any Page**: Select from any published page or post on your site, or enter any custom URL.
+* **Flexible Capture Scope**: Choose between Viewport (above-the-fold) and Full Page (full scrolling height).
+* **Retina Resolution Quality**: Export at 1x Standard, 2x Retina (crisp for high-DPI displays), or 3x Ultra.
+* **Clean Presentation Mode**: Automatically hide the WordPress admin bar for showcase-ready screenshots.
+* **Batch Actions**: Preview all captured devices side-by-side and use "Save All to Media" or "Download All" with one click.
 
-After taking a screenshot, draw on it using the pen, circle, or arrow tools, choose colors and line weights, and export at 1x, 2x, or 3x scale. Images can be downloaded to your computer or saved straight into your WordPress Media Library.
+### On-Page Capture Toolbar
+* **Camera Icon in Admin Bar**: One-click launch from anywhere on your WordPress site.
+* **Area Selection**: Drag to select any custom region with live pixel dimensions and adjust with corner and edge handles.
+* **Window / Element Capture**: Hover over any section or element to highlight and capture it cleanly.
+* **Full Screen Capture**: Instant one-click capture of the entire visible window.
+* **Direct Page & Device Switcher**: Switch pages and preview viewport dimensions directly from the floating capture bar.
 
-Stillframe runs entirely in your browser. It does not send any data to external servers, adds no settings pages to your database, and only loads for logged-in administrators.
+### Professional Annotation Suite
+* **9 Annotation Tools**:
+  * **Select (V)**: Click, marquee drag, Shift-click, or Ctrl+A to multi-select, move, resize, and rotate annotations.
+  * **Pen**: Smooth freehand drawing with adjustable stroke size.
+  * **Circle / Ellipse**: Highlight areas with circular outlines.
+  * **Arrow**: Directional arrows with 45° angle snapping.
+  * **Rectangle**: Clean bounding boxes for framing UI elements.
+  * **Highlighter**: Semi-transparent color highlight strips.
+  * **Text Boxes**: Drag to size, automatic text wrapping, inline typing, and double-click to re-edit.
+  * **Numbered Step Badges**: Auto-incrementing step numbers (1, 2, 3...) for creating tutorials and walkthroughs.
+  * **Blur / Pixelate**: Redact sensitive client data, passwords, or personal details with a privacy blur tool.
+* **Curated Color Palette & Stroke Widths**: Pick harmonious colors and line thicknesses.
+* **Full Undo / Redo**: Step back and forth through any edits with keyboard shortcuts (Ctrl+Z).
+
+### Private & Zero Database Footprint
+Stillframe runs 100% in your browser using modern client-side rendering. It does not send any data to external servers, adds zero tables or options to your database, and only loads for logged-in administrators with `manage_options` permissions.
 
 == Installation ==
 
-1. Go to Plugins > Add New in your WordPress dashboard.
-2. Search for Stillframe and click Install Now.
+1. Go to **Plugins > Add New** in your WordPress dashboard.
+2. Search for **Stillframe** or upload the plugin zip file.
 3. Activate the plugin.
-4. Click the camera icon in the top admin bar, or go to Tools > Stillframe to start capturing.
+4. Click the camera icon in the top admin bar, or go to **Tools > Stillframe** to start capturing.
 
 == Screenshots ==
 
-1. Launch Stillframe from the admin bar to select Area, Window, or Full screen capture.
-2. Drag and resize your capture region with pixel dimensions.
-3. Annotate your screenshot with pen, circle, arrow tools, and save to Media Library or download.
+1. Clean floating capture toolbar with Area selection mode and tooltip on the WordPress dashboard.
+2. Window & element capture mode with live pixel dimensions and instant capture button.
+3. Devices dropdown: frame and capture standard Desktop (1440px), iPad (834px), and Mobile (390px) viewports on screen.
+4. Direct Page capture dropdown: choose target pages, select viewports, toggle clean presentation mode, and select Retina resolution.
+5. Annotation Editor Suite: full canvas markup tools including shapes, arrows, text, numbered steps, blur redaction, and instant export.
 
 == Frequently Asked Questions ==
 
@@ -56,6 +84,18 @@ Stillframe is open-source software. You can view the source code, contribute, or
 Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/modern-screenshot.js. Source: https://github.com/qq15725/modern-screenshot. The license text is in assets/js/vendor/LICENSE-modern-screenshot.txt.
 
 == Changelog ==
+
+= 0.2.0 =
+* Multi-Device Studio: Added full studio under Tools > Stillframe to batch capture Desktop (1440px), iPad/Tablet (834px), and Mobile Phone (390px) views simultaneously.
+* Target Page Picker: Capture any published page, post, or custom URL directly without leaving the admin screen.
+* Batch Showcase Previews: Added responsive preview cards with one-click "Save All to Media" and "Download All" batch actions.
+* Expanded 9-Tool Annotation Suite: Added Select (V), Pen, Circle, Arrow, Rectangle, Highlighter, Text box, Numbered Step badges (1, 2, 3...), and Privacy Blur / Pixelate.
+* Advanced Annotation Transforms: Marquee multi-select, Shift-click, Ctrl+A, bounding resize handles, and rotation handles for all marks.
+* Resizable & Auto-Wrapping Text: Drag to create text boxes, auto-wrap long text, inline typing, and double-click to edit existing text.
+* Direct Page & Viewport Toolbar: Top-bar capture menu now features direct page navigation, viewport presets, and clean presentation toggle.
+* Calmer Background Rendering: Eliminated drag stutter on heavy DOM pages with smarter idle rendering and element thresholding.
+* Clean UI Polish: Brand styling, rounded close buttons, neutral selected states, and crisp visual feedback across all capture tools.
+* Quality & Resolution Controls: Choose between 1x Standard, 2x Retina, and 3x Ultra export resolutions, plus Viewport or Full Page scroll captures.
 
 = 0.1.8 =
 * Refined selection tool with clean native white UI, crisp line edge handles, and square corner anchors
