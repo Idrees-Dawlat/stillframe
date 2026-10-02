@@ -1588,6 +1588,7 @@
 	var SIZES = [2.5, 4, 7];
 
 	var RECENT_KEY = 'stillframe_recent_captures_v1';
+	var RECENT_MAX = 10;
 	var recentBlobs = {};
 
 	function getRecentCaptures() {
@@ -1595,9 +1596,21 @@
 			var raw = window.localStorage.getItem(RECENT_KEY);
 			if (!raw) return [];
 			var list = JSON.parse(raw);
-			return Array.isArray(list) ? list : [];
+			return Array.isArray(list) ? list.slice(0, RECENT_MAX) : [];
 		} catch (e) {
 			return [];
+		}
+	}
+
+	function saveRecentList(list) {
+		// Thumbnails are the bulk of the payload; if storage is full, drop the oldest until it fits.
+		while (list.length) {
+			try {
+				window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+				return;
+			} catch (e) {
+				list.pop();
+			}
 		}
 	}
 
@@ -1629,14 +1642,14 @@
 		var objUrl = URL.createObjectURL(blob);
 		img.onload = function () {
 			try {
-				var maxW = 160;
+				var maxW = 360;
 				var r = Math.min(1, maxW / (img.naturalWidth || width));
 				var thumbCanvas = document.createElement('canvas');
 				thumbCanvas.width = Math.max(1, Math.round((img.naturalWidth || width) * r));
 				thumbCanvas.height = Math.max(1, Math.round((img.naturalHeight || height) * r));
 				var ctx = thumbCanvas.getContext('2d');
 				ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
-				var thumbData = thumbCanvas.toDataURL('image/jpeg', 0.75);
+				var thumbData = thumbCanvas.toDataURL('image/jpeg', 0.72);
 
 				var cleanTitle = title || '';
 				if (!cleanTitle || cleanTitle.indexOf('http') === 0) {
@@ -1660,8 +1673,8 @@
 
 				var list = getRecentCaptures();
 				list.unshift(item);
-				if (list.length > 8) list = list.slice(0, 8);
-				window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+				if (list.length > RECENT_MAX) list = list.slice(0, RECENT_MAX);
+				saveRecentList(list);
 			} catch (err) {
 				console.warn('Stillframe recent save error', err);
 			} finally {
@@ -2693,12 +2706,15 @@
 				return;
 			}
 			var sizeNow = viewSize();
-			captureRect({
-				x: 0,
-				y: 0,
-				width: sizeNow.width,
-				height: sizeNow.height
-			});
+			closeAllMenus();
+			mode = 'rect';
+			root.setAttribute('data-mode', 'rect');
+			rectButton.setAttribute('aria-pressed', 'false');
+			windowModeButton.setAttribute('aria-pressed', 'false');
+			fullButton.setAttribute('aria-pressed', 'true');
+			sel = { x: 0, y: 0, width: sizeNow.width, height: sizeNow.height };
+			showSelection(sel);
+			scheduleShot(IDLE_BEFORE_RENDER_MS);
 		});
 
 		function closeAllMenus() {
@@ -2779,21 +2795,8 @@
 			sec1Grid.appendChild(devItem);
 		});
 
-		var devFooter = element('div', { className: 'stillframe-hub-footer' });
-		var devStudioLink = element('a', {
-			href: (config && config.toolsUrl) || '/wp-admin/tools.php?page=stillframe',
-			className: 'stillframe-snip__dev-link',
-			text: 'Multi-Device Studio (Batch Export)'
-		});
-		devStudioLink.appendChild(iconSvg('arrow', 12));
-		devStudioLink.addEventListener('click', function () {
-			destroySnip();
-		});
-		devFooter.appendChild(devStudioLink);
-
 		devMenu.appendChild(sec1Title);
 		devMenu.appendChild(sec1Grid);
-		devMenu.appendChild(devFooter);
 
 		function toggleMenu(menu, button, onOpen) {
 			var wasOpen = !menu.hidden;
@@ -3095,18 +3098,6 @@
 			openMultiDirectCapture(targetUrl, selected, targetScale, hideAdmin, isFullPage);
 		});
 
-		var directFooter = element('div', { className: 'stillframe-hub-footer' });
-		var directStudioLink = element('a', {
-			href: (config && config.toolsUrl) || '/wp-admin/tools.php?page=stillframe',
-			className: 'stillframe-snip__dev-link',
-			text: 'Multi-Device Studio (Batch Export)'
-		});
-		directStudioLink.appendChild(iconSvg('arrow', 12));
-		directStudioLink.addEventListener('click', function () {
-			destroySnip();
-		});
-		directFooter.appendChild(directStudioLink);
-
 		directMenu.appendChild(directTitle);
 		directMenu.appendChild(hubPageWrap);
 		directMenu.appendChild(hubDevGroup);
@@ -3114,7 +3105,6 @@
 		directMenu.appendChild(hubResField);
 		directMenu.appendChild(hubHeightField);
 		directMenu.appendChild(hubSubmit);
-		directMenu.appendChild(directFooter);
 
 		directButton.addEventListener('click', function (event) {
 			stopBar(event);
@@ -3229,12 +3219,16 @@
 			var width = actions.offsetWidth || 180;
 			var height = actions.offsetHeight || 38;
 			var top;
-			// If actions fits comfortably below the box, place it 8px below
+			var barBottom = bar.getBoundingClientRect().bottom + 8;
 			if (rect.y + rect.height + height + 12 <= window.innerHeight) {
+				// Fits below the selection.
 				top = rect.y + rect.height + 8;
+			} else if (rect.y - height - 8 >= barBottom) {
+				// No room below, so sit just above it, clear of the top bar.
+				top = rect.y - height - 8;
 			} else {
-				// Otherwise place it inside the bottom edge of the box
-				top = Math.max(80, rect.y + rect.height - height - 12);
+				// Tall selection: tuck inside the bottom edge.
+				top = Math.max(barBottom, rect.y + rect.height - height - 12);
 			}
 			// Center horizontally relative to the selection box, constrained within viewport
 			var left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.x + Math.round((rect.width - width) / 2)));
@@ -3248,13 +3242,20 @@
 				size.style.display = 'none';
 				actions.hidden = true;
 				actions.style.display = 'none';
-				box.classList.remove('is-adjusting');
+				box.classList.remove('is-adjusting', 'is-small');
+				root.classList.remove('is-under-bar');
 				hint.hidden = false;
 				root.classList.remove('is-selecting');
 				return;
 			}
 			box.hidden = false;
 			box.classList.toggle('is-adjusting', !!sel);
+			// Tiny boxes get tiny handles, so they do not swallow the selection.
+			box.classList.toggle('is-small', rect.width < 90 || rect.height < 90);
+			// A selection parked under the top bar would hide its own handles, so
+			// the bar steps back (and the box rises above it) until it moves away.
+			var barBottomNow = bar.getBoundingClientRect().bottom;
+			root.classList.toggle('is-under-bar', rect.y < barBottomNow && rect.y + rect.height < barBottomNow + 120);
 			hint.hidden = true;
 			root.classList.add('is-selecting');
 			box.style.transform = 'translate3d(' + rect.x + 'px,' + rect.y + 'px,0)';

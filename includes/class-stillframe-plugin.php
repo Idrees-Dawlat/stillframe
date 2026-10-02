@@ -63,6 +63,8 @@ class Stillframe_Plugin {
 		add_action( 'admin_bar_menu', array( $this->menu, 'register' ), 100 );
 		add_action( 'wp_enqueue_scripts', array( $this->assets, 'enqueue' ) );
 		add_action( 'admin_enqueue_scripts', array( $this->assets, 'enqueue' ) );
+		add_action( 'save_post', array( 'Stillframe_Asset_Loader', 'flush_pages_cache' ) );
+		add_action( 'deleted_post', array( 'Stillframe_Asset_Loader', 'flush_pages_cache' ) );
 	}
 }
 

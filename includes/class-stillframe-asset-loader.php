@@ -15,6 +15,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Stillframe_Asset_Loader {
 
 	/**
+	 * Transient holding the page picker list.
+	 *
+	 * @var string
+	 */
+	public const PAGES_TRANSIENT = 'stillframe_site_pages';
+
+	/**
 	 * Query arguments that must not be replayed inside the capture frame.
 	 *
 	 * @var string[]
@@ -161,6 +168,11 @@ class Stillframe_Asset_Loader {
 	 * @return array<int, array{id: int, title: string, type: string, url: string}>
 	 */
 	private function site_pages() {
+		$cached = get_transient( self::PAGES_TRANSIENT );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		$items = array();
 		$pages = get_posts(
 			array(
@@ -182,7 +194,17 @@ class Stillframe_Asset_Loader {
 				);
 			}
 		}
+		set_transient( self::PAGES_TRANSIENT, $items, 12 * HOUR_IN_SECONDS );
 		return $items;
+	}
+
+	/**
+	 * Drop the cached page list when content changes.
+	 *
+	 * @return void
+	 */
+	public static function flush_pages_cache() {
+		delete_transient( self::PAGES_TRANSIENT );
 	}
 
 	/**

@@ -245,11 +245,22 @@
 				launch(tools, false);
 			});
 		}
-		window.setTimeout(function () {
+		// Nothing is fetched until the admin touches the button. Hover or focus
+		// starts the download a moment before the click, so it still feels instant
+		// without costing every page view the capture scripts.
+		var warm = function () {
 			ensurePanelAssets().catch(function () {
 				return null;
 			});
-		}, 0);
+		};
+		[link, tools].forEach(function (node) {
+			if (!node) {
+				return;
+			}
+			node.addEventListener('pointerenter', warm, { once: true });
+			node.addEventListener('focus', warm, { once: true });
+			node.addEventListener('touchstart', warm, { once: true, passive: true });
+		});
 	}
 
 	if (document.readyState === 'loading') {
