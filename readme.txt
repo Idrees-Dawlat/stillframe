@@ -96,6 +96,8 @@ Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/mod
 * Calmer Background Rendering: Eliminated drag stutter on heavy DOM pages with smarter idle rendering and element thresholding.
 * Clean UI Polish: Brand styling, rounded close buttons, neutral selected states, and crisp visual feedback across all capture tools.
 * Quality & Resolution Controls: Choose between 1x Standard, 2x Retina, and 3x Ultra export resolutions, plus Viewport or Full Page scroll captures.
+* Author Branding: Updated author to Grafucci.
+* Visual Showcase: Added complete animated walkthrough and new real-world showcase screenshots.
 
 = 0.1.8 =
 * Refined selection tool with clean native white UI, crisp line edge handles, and square corner anchors

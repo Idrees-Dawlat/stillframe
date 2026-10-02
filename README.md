@@ -2,6 +2,8 @@
 
 Stillframe is a lightweight WordPress plugin that lets administrators capture, annotate, and export screenshots of any admin dashboard screen or front-end page directly inside the browser.
 
+![Stillframe Walkthrough](assets-wporg/walkthrough.gif)
+
 ## Features
 
 - **Multi-Device Studio (Tools > Stillframe)**: Batch-capture Desktop (1440px), iPad/Tablet (834px), and Mobile Phone (390px) viewports with one click.
