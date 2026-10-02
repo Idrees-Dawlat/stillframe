@@ -513,3 +513,45 @@
 .stillframe-switch-wrap input.stillframe-switch-input:checked + .stillframe-switch-slider {
 	background: var(--sf-ink);
 }
+
+/* Softer, button-like choices */
+.stillframe-pill {
+	background: #fafafa;
+	border-color: #b4bac4;
+}
+
+.stillframe-pill:hover {
+	background: #f0f0f1;
+	border-color: #6b7280;
+}
+
+.stillframe-pill.is-active,
+.stillframe-pill.is-active:hover {
+	background: #eceef1;
+	border-color: #6b7280;
+	color: var(--sf-ink);
+}
+
+.stillframe-device-tile {
+	border-width: 1px;
+	border-color: #b4bac4;
+}
+
+.stillframe-device-tile.is-active {
+	background: #f3f4f6;
+	border-color: #6b7280;
+	box-shadow: inset 0 0 0 1px #6b7280;
+}
+
+.stillframe-device-tile.is-active .stillframe-device-tile__check {
+	background: #6b7280;
+	border-color: #6b7280;
+}
+
+.stillframe-switch-wrap input.stillframe-switch-input:checked + .stillframe-switch-slider {
+	background: #6b7280;
+}
+
+.stillframe-box__header {
+	padding: 18px 28px;
+}

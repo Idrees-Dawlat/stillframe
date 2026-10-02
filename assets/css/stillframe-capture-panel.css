@@ -1845,3 +1845,110 @@ body.stillframe-locked {
 .stillframe-snip input::selection {
 	background: #cfe3ff;
 }
+
+/* Softer, button-like choices -------------------------------------------- */
+
+.stillframe-snip,
+.stillframe-result {
+	--sf-pick-line: #6b7280;
+	--sf-edge: #b4bac4;
+}
+
+.stillframe-hub-pill {
+	background: #fafafa;
+	border-color: var(--sf-edge);
+	color: var(--sf-text-2);
+}
+
+.stillframe-hub-pill:hover {
+	background: var(--sf-well);
+	border-color: var(--sf-pick-line);
+}
+
+.stillframe-hub-pill.is-active,
+.stillframe-hub-pill.is-active:hover {
+	background: #eceef1;
+	border-color: var(--sf-pick-line);
+	color: var(--sf-text);
+}
+
+.stillframe-dev-card {
+	border-width: 1px;
+	border-color: var(--sf-edge);
+}
+
+.stillframe-dev-card.is-selected {
+	background: #f3f4f6;
+	border-color: var(--sf-pick-line);
+	box-shadow: inset 0 0 0 1px var(--sf-pick-line);
+}
+
+.stillframe-dev-card.is-selected .stillframe-dev-card__check {
+	background: var(--sf-pick-line);
+	border-color: var(--sf-pick-line);
+}
+
+.stillframe-dev-cards-quick {
+	padding: 4px 10px;
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--sf-text-2);
+	background: #fafafa;
+	border: 1px solid var(--sf-edge);
+	border-radius: 6px;
+	text-decoration: none;
+}
+
+.stillframe-dev-cards-quick:hover {
+	background: var(--sf-well);
+	border-color: var(--sf-pick-line);
+	text-decoration: none;
+}
+
+/* Admin-bar switch in the Direct Page menu */
+.stillframe-hub-toggle {
+	gap: 10px;
+}
+
+.stillframe-hub-toggle input.stillframe-hub-toggle__input {
+	position: absolute;
+	opacity: 0;
+	width: 0;
+	height: 0;
+	margin: 0;
+	pointer-events: none;
+}
+
+.stillframe-hub-toggle__track {
+	position: relative;
+	flex: 0 0 auto;
+	width: 32px;
+	height: 18px;
+	background: #c3c4c7;
+	border-radius: 18px;
+}
+
+.stillframe-hub-toggle__track::before {
+	content: "";
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 12px;
+	height: 12px;
+	background: #ffffff;
+	border-radius: 50%;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.stillframe-hub-toggle__input:checked + .stillframe-hub-toggle__track {
+	background: var(--sf-pick-line);
+}
+
+.stillframe-hub-toggle__input:checked + .stillframe-hub-toggle__track::before {
+	transform: translateX(14px);
+}
+
+.stillframe-hub-toggle__input:focus-visible + .stillframe-hub-toggle__track {
+	outline: 2px solid var(--sf-ink);
+	outline-offset: 2px;
+}

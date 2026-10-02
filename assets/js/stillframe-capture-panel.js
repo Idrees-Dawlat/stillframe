@@ -2407,8 +2407,11 @@
 				return;
 			}
 			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
-				// Nothing in the editor should be selectable as page text.
+				// Select every annotation; never highlight the page text underneath.
 				event.preventDefault();
+				if (editor && editor.selectAll) {
+					editor.selectAll();
+				}
 				return;
 			}
 			if ((event.key === 'Delete' || event.key === 'Backspace') && editor && editor.deleteSelected && editor.deleteSelected()) {
@@ -3048,9 +3051,10 @@
 
 		// Admin Bar Option
 		var hubAdminLabel = element('label', { className: 'stillframe-hub-toggle' });
-		var hubAdminCb = element('input', { type: 'checkbox' });
+		var hubAdminCb = element('input', { type: 'checkbox', className: 'stillframe-hub-toggle__input' });
 		hubAdminCb.checked = true;
 		hubAdminLabel.appendChild(hubAdminCb);
+		hubAdminLabel.appendChild(element('span', { className: 'stillframe-hub-toggle__track' }));
 		hubAdminLabel.appendChild(element('span', { text: 'Hide WordPress Admin Bar' }));
 
 		// Resolution Quality - pill selector (1x / 2x / 3x)

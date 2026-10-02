@@ -64,12 +64,7 @@ class Stillframe_Tools_Page {
 			<hr class="wp-header-end" />
 			<div class="stillframe-box">
 				<div class="stillframe-box__header">
-					<img src="<?php echo esc_url( plugins_url( 'assets/images/icon-128x128.png', STILLFRAME_FILE ) ); ?>" width="44" height="44" alt="" class="stillframe-box__logo" />
-					<div class="stillframe-box__brand">
-						<p class="stillframe-box__title"><?php esc_html_e( 'Stillframe Studio', 'stillframe' ); ?></p>
-						<p class="stillframe-box__sub"><?php esc_html_e( 'Capture any page at desktop, tablet and phone sizes, then annotate and export.', 'stillframe' ); ?></p>
-					</div>
-					<span class="stillframe-box__version"><?php echo esc_html( 'v' . STILLFRAME_VERSION ); ?></span>
+					<p class="stillframe-box__title"><?php esc_html_e( 'Stillframe Studio', 'stillframe' ); ?></p>
 				</div>
 
 				<form id="stillframe-multicapture-form" onsubmit="return false;" class="stillframe-box__body">
