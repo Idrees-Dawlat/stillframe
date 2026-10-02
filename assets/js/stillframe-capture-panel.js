@@ -51,7 +51,7 @@
 	// render freezes the main thread and would make the drag stutter.
 	var HEAVY_PAGE_NODES = 1500;
 	var SLOW_RENDER_MS = 700;
-	var IDLE_BEFORE_RENDER_MS = 600;
+	var IDLE_BEFORE_RENDER_MS = 1500;
 
 	function canPrerender() {
 		if (viewShot.slow) {
@@ -3263,6 +3263,12 @@
 			lastActivity = Date.now();
 		}
 
+		// Any click, key or pointer movement in the overlay counts as activity, so the
+		// heavy background render never starts in the middle of fast interaction.
+		['pointerdown', 'pointermove', 'keydown'].forEach(function (type) {
+			root.addEventListener(type, touch, true);
+		});
+
 		// Rendering the page is heavy main-thread work. Only start it when the
 		// pointer has been idle, so it never competes with a drag or a mode switch.
 		function scheduleShot(delay) {
@@ -3274,7 +3280,7 @@
 				if (!snip || snipBusy || viewShot.canvas || viewShot.work) {
 					return;
 				}
-				if (drag || Date.now() - lastActivity < IDLE_BEFORE_RENDER_MS) {
+				if (drag || root.classList.contains('has-menu-open') || Date.now() - lastActivity < IDLE_BEFORE_RENDER_MS) {
 					scheduleShot(300);
 					return;
 				}

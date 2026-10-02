@@ -64,7 +64,7 @@ class Stillframe_Tools_Page {
 			<hr class="wp-header-end" />
 			<div class="stillframe-box">
 				<div class="stillframe-box__header">
-					<p class="stillframe-box__title"><?php esc_html_e( 'Stillframe Studio', 'stillframe' ); ?></p>
+					<p class="stillframe-box__title"><?php esc_html_e( 'Stillframe', 'stillframe' ); ?></p>
 				</div>
 
 				<form id="stillframe-multicapture-form" onsubmit="return false;" class="stillframe-box__body">

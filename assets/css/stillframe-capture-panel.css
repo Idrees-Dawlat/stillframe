@@ -2012,3 +2012,61 @@ body.stillframe-locked {
 .stillframe-snip__reset {
 	border-radius: 50%;
 }
+
+/* Brand accents for the active capture state ------------------------------- */
+.stillframe-snip__go { background: var(--sf-brand, #005976); }
+.stillframe-snip__go:hover { background: var(--sf-brand-hover, #004a61); }
+.stillframe-snip__go:active { background: #003d51; }
+
+.stillframe-snip__bar button[aria-pressed="true"],
+.stillframe-snip.has-menu-open .stillframe-snip__bar button[aria-expanded="true"] {
+	color: var(--sf-brand);
+	background: var(--sf-brand-muted);
+	border-color: var(--sf-brand);
+}
+
+.stillframe-snip__handle,
+.stillframe-snip__handle:hover {
+	border-color: var(--sf-brand);
+}
+
+/* Selection / window-hover frame: brand outline with a white inner edge so it
+   reads on both light and dark pages. */
+.stillframe-snip__box {
+	border: 2px solid var(--sf-brand);
+	box-shadow: 0 0 0 1px #ffffff inset, 0 0 0 100vmax var(--sf-dim), 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+/* Compact device cards in the Direct Page menu ------------------------------ */
+.stillframe-dev-cards-grid { gap: 6px; }
+
+.stillframe-dev-card {
+	flex-direction: row;
+	align-items: center;
+	flex-wrap: wrap;
+	column-gap: 8px;
+	row-gap: 0;
+	padding: 7px 28px 7px 9px;
+	border-radius: 6px;
+}
+
+.stillframe-dev-card__icon { margin: 0; flex: 0 0 auto; }
+.stillframe-dev-card__icon svg { width: 16px; height: 16px; }
+.stillframe-dev-card__name { font-size: 12px; }
+.stillframe-dev-card__dim { flex-basis: 100%; padding-left: 24px; font-size: 10.5px; margin-top: 1px; }
+
+.stillframe-dev-card__check {
+	top: 8px;
+	right: 8px;
+	width: 14px;
+	height: 14px;
+	border-width: 1.5px;
+}
+.stillframe-dev-card__check svg { width: 8px; height: 8px; }
+
+.stillframe-snip__bar .stillframe-hub-submit {
+	height: 32px !important;
+	font-size: 12.5px !important;
+}
+.stillframe-snip__bar .stillframe-hub-sec { margin-bottom: 0; }
+.stillframe-snip__direct-menu { width: 480px; padding: 12px; gap: 8px; }
