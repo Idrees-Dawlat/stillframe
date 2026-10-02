@@ -947,6 +947,17 @@
 				important(doc.getElementById('adminmenuwrap'), 'top', '0px');
 				important(doc.getElementById('adminmenuback'), 'top', '0px');
 			}
+			try {
+				var styleTag = doc.createElement('style');
+				styleTag.id = 'stillframe-hide-admin-bar-style';
+				styleTag.textContent = '#wpadminbar { display: none !important; visibility: hidden !important; height: 0 !important; max-height: 0 !important; overflow: hidden !important; } html, body { margin-top: 0px !important; padding-top: 0px !important; }';
+				(doc.head || doc.documentElement).appendChild(styleTag);
+				restorers.push(function () {
+					if (styleTag.parentNode) {
+						styleTag.parentNode.removeChild(styleTag);
+					}
+				});
+			} catch (e) {}
 		}
 
 		if (!prefs.adminMenu) {
@@ -1237,7 +1248,8 @@
 		});
 	}
 
-	function prepareAndShoot(local, scale) {
+	function prepareAndShoot(local, scale, options) {
+		options = options || {};
 		var restore = function () {};
 
 		function restoreOnce() {
@@ -1252,8 +1264,27 @@
 				blocked.code = 'blocked';
 				throw blocked;
 			}
-			restore = applyScene(local.contentDocument, readPrefs());
-			local.style.height = measureHeight(local.contentDocument) + 'px';
+			var prefs = readPrefs();
+			if (options && typeof options.hideAdminBar === 'boolean') {
+				prefs.adminBar = !options.hideAdminBar;
+			}
+			restore = applyScene(local.contentDocument, prefs);
+			var frameWidth = parseInt(local.style.width, 10) || local.clientWidth || 1;
+			var frameHeight;
+			if (options.fullPage === false) {
+				if (options.viewportHeight) {
+					frameHeight = parseInt(options.viewportHeight, 10);
+				} else if (frameWidth <= 480) {
+					frameHeight = 844;
+				} else if (frameWidth <= 1024) {
+					frameHeight = 1112;
+				} else {
+					frameHeight = 900;
+				}
+			} else {
+				frameHeight = measureHeight(local.contentDocument);
+			}
+			local.style.height = frameHeight + 'px';
 			return nextFrames(1);
 		}).then(function () {
 			if (!canReadFrame(local)) {
@@ -1263,16 +1294,12 @@
 				throw blockedLater;
 			}
 			var doc = local.contentDocument;
-			var frameWidth = parseInt(local.style.width, 10);
-			if (!frameWidth) {
-				frameWidth = local.clientWidth || 1;
-			}
-			var frameHeight = measureHeight(doc);
-			local.style.height = frameHeight + 'px';
+			var frameWidth = parseInt(local.style.width, 10) || local.clientWidth || 1;
+			var frameHeight = parseInt(local.style.height, 10) || measureHeight(doc);
 			return shoot(doc.documentElement, scale, {
 				width: frameWidth,
 				height: frameHeight,
-				fullPage: true
+				fullPage: options.fullPage !== false
 			}, local.contentWindow);
 		}).then(function (blob) {
 			restoreOnce();
@@ -1452,6 +1479,22 @@
 		check: [
 			{ d: 'M20 6L9 17l-5-5' }
 		],
+		page: [
+			{ tag: 'path', d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' },
+			{ tag: 'polyline', points: '14 2 14 8 20 8' },
+			{ tag: 'line', x1: '16', y1: '13', x2: '8', y2: '13' },
+			{ tag: 'line', x1: '16', y1: '17', x2: '8', y2: '17' }
+		],
+		recent: [
+			{ tag: 'circle', cx: '12', cy: '12', r: '9' },
+			{ d: 'M12 7v5l3 2' }
+		],
+		trash: [
+			{ d: 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z' }
+		],
+		edit: [
+			{ d: 'M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z' }
+		],
 		camera: [
 			{ tag: 'path', d: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z' },
 			{ tag: 'circle', cx: '12', cy: '13', r: '4' }
@@ -1480,6 +1523,25 @@
 			{ tag: 'rect', x: '3.5', y: '4.5', width: '17', height: '15', rx: '2.5' },
 			{ tag: 'circle', cx: '9', cy: '10', r: '1.6' },
 			{ d: 'M20.5 16l-5-5L8 19.5' }
+		],
+		desktop: [
+			{ tag: 'rect', x: '2', y: '3', width: '20', height: '14', rx: '2' },
+			{ d: 'M8 21h8M12 17v4' }
+		],
+		tablet: [
+			{ tag: 'rect', x: '4', y: '2', width: '16', height: '20', rx: '2' },
+			{ d: 'M12 18h.01' }
+		],
+		mobile: [
+			{ tag: 'rect', x: '5', y: '2', width: '14', height: '20', rx: '2' },
+			{ d: 'M12 18h.01' }
+		],
+		devices: [
+			{ tag: 'rect', x: '2', y: '4', width: '13', height: '11', rx: '1.5' },
+			{ tag: 'rect', x: '11', y: '9', width: '11', height: '12', rx: '1.5' }
+		],
+		chevronDown: [
+			{ d: 'M6 9l6 6 6-6' }
 		]
 	};
 
@@ -1525,7 +1587,230 @@
 	var SWATCHES = ['#ef4444', '#f59e0b', '#facc15', '#059669', '#005976', '#3b82f6', '#ffffff', '#111827'];
 	var SIZES = [2.5, 4, 7];
 
-	function openResult(rect, work, token) {
+	var RECENT_KEY = 'stillframe_recent_captures_v1';
+	var recentBlobs = {};
+
+	function getRecentCaptures() {
+		try {
+			var raw = window.localStorage.getItem(RECENT_KEY);
+			if (!raw) return [];
+			var list = JSON.parse(raw);
+			return Array.isArray(list) ? list : [];
+		} catch (e) {
+			return [];
+		}
+	}
+
+	function deleteRecentCapture(id) {
+		try {
+			var list = getRecentCaptures().filter(function (it) { return it.id !== id; });
+			window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+			delete recentBlobs[id];
+		} catch (e) {}
+	}
+
+	function formatRecentTime(ts) {
+		var diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+		if (diff < 10) return 'Just now';
+		if (diff < 60) return diff + 's ago';
+		var mins = Math.floor(diff / 60);
+		if (mins < 60) return mins + 'm ago';
+		var hours = Math.floor(mins / 60);
+		if (hours < 24) return hours + 'h ago';
+		return Math.floor(hours / 24) + 'd ago';
+	}
+
+	function saveCaptureToRecent(blob, width, height, title, url) {
+		if (!blob || !width || !height) return;
+		var id = 'sf_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+		recentBlobs[id] = blob;
+
+		var img = new Image();
+		var objUrl = URL.createObjectURL(blob);
+		img.onload = function () {
+			try {
+				var maxW = 160;
+				var r = Math.min(1, maxW / (img.naturalWidth || width));
+				var thumbCanvas = document.createElement('canvas');
+				thumbCanvas.width = Math.max(1, Math.round((img.naturalWidth || width) * r));
+				thumbCanvas.height = Math.max(1, Math.round((img.naturalHeight || height) * r));
+				var ctx = thumbCanvas.getContext('2d');
+				ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
+				var thumbData = thumbCanvas.toDataURL('image/jpeg', 0.75);
+
+				var cleanTitle = title || '';
+				if (!cleanTitle || cleanTitle.indexOf('http') === 0) {
+					try {
+						cleanTitle = new URL(url || window.location.href).pathname || 'Screenshot';
+						if (cleanTitle === '/') cleanTitle = 'Home Page';
+					} catch (e) {
+						cleanTitle = 'Screenshot';
+					}
+				}
+
+				var item = {
+					id: id,
+					title: cleanTitle,
+					url: url || window.location.href,
+					width: width,
+					height: height,
+					timestamp: Date.now(),
+					thumb: thumbData
+				};
+
+				var list = getRecentCaptures();
+				list.unshift(item);
+				if (list.length > 8) list = list.slice(0, 8);
+				window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+			} catch (err) {
+				console.warn('Stillframe recent save error', err);
+			} finally {
+				URL.revokeObjectURL(objUrl);
+			}
+		};
+		img.onerror = function () {
+			URL.revokeObjectURL(objUrl);
+		};
+		img.src = objUrl;
+	}
+
+	function openRecentCaptureInEditor(item) {
+		var token = ++session;
+		var rect = {
+			x: 0,
+			y: 0,
+			width: item.width || 1440,
+			height: item.height || 900,
+			scale: 1,
+			url: item.url || window.location.href
+		};
+		var work;
+		if (recentBlobs[item.id]) {
+			work = Promise.resolve(recentBlobs[item.id]);
+		} else if (item.thumb) {
+			work = window.fetch(item.thumb).then(function (r) { return r.blob(); });
+		} else {
+			return;
+		}
+		openResult(rect, work, token);
+	}
+
+	function uploadRecentToMedia(item, btn) {
+		if (!config.canUpload || !config.ajaxUrl || !config.mediaNonce) return;
+		var getBlobPromise = recentBlobs[item.id]
+			? Promise.resolve(recentBlobs[item.id])
+			: window.fetch(item.thumb).then(function (r) { return r.blob(); });
+
+		if (btn) btn.disabled = true;
+		getBlobPromise.then(function (blob) {
+			var body = new FormData();
+			body.append('action', 'stillframe_save_media');
+			body.append('nonce', String(config.mediaNonce));
+			body.append('image', blob, 'stillframe-' + item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + item.width + 'x' + item.height + '.png');
+			return window.fetch(String(config.ajaxUrl), {
+				method: 'POST',
+				credentials: 'same-origin',
+				body: body
+			});
+		}).then(function (res) {
+			return res.json();
+		}).then(function () {
+			if (btn) {
+				btn.disabled = false;
+				btn.title = 'Saved to Media Library!';
+				btn.style.color = '#059669';
+			}
+		}).catch(function () {
+			if (btn) btn.disabled = false;
+		});
+	}
+
+	function renderRecentList(container, onSelect, onAction) {
+		while (container.firstChild) {
+			container.removeChild(container.firstChild);
+		}
+		var list = getRecentCaptures();
+		if (list.length === 0) {
+			var empty = element('div', {
+				className: 'stillframe-recent-empty',
+				text: 'No recent screenshots yet. Capture an area, full screen, or page to build your history.'
+			});
+			container.appendChild(empty);
+			return;
+		}
+		var listWrap = element('div', { className: 'stillframe-recent-list' });
+		list.forEach(function (item) {
+			var card = element('div', { className: 'stillframe-recent-card' });
+			if (item.thumb) {
+				var thumb = element('img', {
+					className: 'stillframe-recent-thumb',
+					alt: item.title,
+					src: item.thumb
+				});
+				card.appendChild(thumb);
+			}
+			var info = element('div', { className: 'stillframe-recent-info' });
+			var titleEl = element('strong', { className: 'stillframe-recent-title', text: item.title });
+			var metaEl = element('span', {
+				className: 'stillframe-recent-meta',
+				text: (item.width && item.height ? item.width + '×' + item.height + ' • ' : '') + formatRecentTime(item.timestamp)
+			});
+			info.appendChild(titleEl);
+			info.appendChild(metaEl);
+			card.appendChild(info);
+
+			var actions = element('div', { className: 'stillframe-recent-actions' });
+			var editBtn = element('button', {
+				type: 'button',
+				className: 'stillframe-recent-btn',
+				title: 'Open in Editor (Draw & Annotate)'
+			});
+			editBtn.appendChild(iconSvg('edit', 13));
+			editBtn.addEventListener('click', function (e) {
+				e.stopPropagation();
+				if (onSelect) onSelect(item);
+			});
+			actions.appendChild(editBtn);
+
+			if (config.canUpload) {
+				var mediaBtn = element('button', {
+					type: 'button',
+					className: 'stillframe-recent-btn',
+					title: 'Save to Media Library'
+				});
+				mediaBtn.appendChild(iconSvg('media', 13));
+				mediaBtn.addEventListener('click', function (e) {
+					e.stopPropagation();
+					uploadRecentToMedia(item, mediaBtn);
+				});
+				actions.appendChild(mediaBtn);
+			}
+
+			var delBtn = element('button', {
+				type: 'button',
+				className: 'stillframe-recent-btn stillframe-recent-btn--del',
+				title: 'Remove'
+			});
+			delBtn.appendChild(iconSvg('trash', 13));
+			delBtn.addEventListener('click', function (e) {
+				e.stopPropagation();
+				deleteRecentCapture(item.id);
+				renderRecentList(container, onSelect, onAction);
+			});
+			actions.appendChild(delBtn);
+
+			card.appendChild(actions);
+
+			card.addEventListener('click', function () {
+				if (onSelect) onSelect(item);
+			});
+
+			listWrap.appendChild(card);
+		});
+		container.appendChild(listWrap);
+	}
+
+	function openResult(rect, work, token, multiOptions) {
 		if (editor) {
 			editor.destroy();
 			editor = null;
@@ -1544,8 +1829,8 @@
 		captured = {
 			width: Math.max(1, Math.round(rect.width)),
 			height: Math.max(1, Math.round(rect.height)),
-			scale: viewShot.scale || 1,
-			url: window.location.href,
+			scale: (rect && rect.scale) || viewShot.scale || 1,
+			url: (rect && rect.url) || window.location.href,
 			blob: null
 		};
 
@@ -1679,6 +1964,10 @@
 		toolsWrap.appendChild(historyGroup);
 
 		var saveGroup = element('div', { className: 'stillframe-result__actions' });
+		var recentDrawerButton = iconButton('recent', text('recent') || 'Recent', 'stillframe-btn', true, 'Recent Screenshots');
+		recentDrawerButton.addEventListener('click', function () {
+			toggleRecentDrawer();
+		});
 		mediaButton = iconButton('media', text('saveMedia'), 'stillframe-btn', true);
 		mediaButton.addEventListener('click', function () {
 			requestAction('media');
@@ -1694,6 +1983,7 @@
 		closeButton.addEventListener('click', function () {
 			api.closePanel();
 		});
+		saveGroup.appendChild(recentDrawerButton);
 		saveGroup.appendChild(mediaButton);
 		saveGroup.appendChild(downloadButton);
 		saveGroup.appendChild(closeButton);
@@ -1712,9 +2002,328 @@
 		stage.appendChild(canvasWrap);
 		editorSection = stage;
 
+		var drawer = element('div', { className: 'stillframe-result__drawer' });
+		drawer.hidden = true;
+		var drawerHead = element('div', { className: 'stillframe-result__drawer-head' });
+		drawerHead.appendChild(element('strong', { text: 'Recent Screenshots' }));
+		var drawerClose = element('button', { type: 'button', className: 'stillframe-result__drawer-close', title: 'Close' });
+		drawerClose.appendChild(iconSvg('close', 14));
+		drawerClose.addEventListener('click', function () {
+			drawer.hidden = true;
+			recentDrawerButton.setAttribute('aria-expanded', 'false');
+		});
+		drawerHead.appendChild(drawerClose);
+		drawer.appendChild(drawerHead);
+
+		var drawerBody = element('div', { className: 'stillframe-result__drawer-body' });
+		drawer.appendChild(drawerBody);
+
+		function toggleRecentDrawer() {
+			var isHidden = !drawer.hidden;
+			drawer.hidden = isHidden;
+			recentDrawerButton.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+			if (!isHidden) {
+				renderRecentList(drawerBody, function (item) {
+					openRecentCaptureInEditor(item);
+				});
+			}
+		}
+
+		// Main Body (Sidebar + Stage + Drawer)
+		var mainBody = element('div', { className: 'stillframe-result__body' });
+
+		// Multi-device Left Sidebar
+		var hasMulti = multiOptions && Array.isArray(multiOptions.devices) && multiOptions.devices.length > 1;
+		var devicesList = (multiOptions && multiOptions.devices) || [];
+		var currentDeviceId = multiOptions && multiOptions.activeDeviceId ? multiOptions.activeDeviceId : (devicesList[0] ? devicesList[0].id : '');
+		var currentDevice = devicesList.find(function (d) { return d.id === currentDeviceId; }) || devicesList[0] || null;
+		var tabElements = {};
+
+		var sidebar = element('aside', {
+			className: 'stillframe-result__sidebar',
+			role: 'region',
+			'aria-label': 'Captured Devices'
+		});
+		if (!hasMulti) {
+			sidebar.hidden = true;
+		}
+
+		var sidebarHead = element('div', { className: 'stillframe-result__sidebar-head' });
+		sidebarHead.appendChild(element('span', { text: 'Viewports' }));
+		sidebarHead.appendChild(element('span', {
+			className: 'stillframe-result__sidebar-badge',
+			text: devicesList.length + ' Devices'
+		}));
+		sidebar.appendChild(sidebarHead);
+
+		var sidebarList = element('div', { className: 'stillframe-result__sidebar-list', role: 'tablist' });
+
+		function updateDeviceTabPreview(dev) {
+			var tab = tabElements[dev.id];
+			if (!tab) return;
+			var preview = tab.querySelector('.stillframe-device-tab__preview');
+			if (!preview) return;
+			while (preview.firstChild) preview.removeChild(preview.firstChild);
+
+			if (dev.status === 'ready' && dev.image) {
+				var img = element('img', {
+					src: dev.image.src,
+					alt: dev.label
+				});
+				preview.appendChild(img);
+				var resEl = tab.querySelector('.stillframe-device-tab__res');
+				if (resEl) {
+					resEl.textContent = dev.width + ' × ' + dev.height;
+				}
+			} else if (dev.status === 'error') {
+				preview.appendChild(iconSvg('close', 14));
+				preview.style.color = '#ef4444';
+			} else {
+				var spin = element('span', { className: 'stillframe-device-tab__spinner' });
+				preview.appendChild(spin);
+			}
+		}
+
+		function updateDeviceAnnotationBadge(dev) {
+			var tab = tabElements[dev.id];
+			if (!tab) return;
+			var badge = tab.querySelector('.stillframe-device-tab__annotated');
+			var hasMarks = dev.marks && dev.marks.length > 0;
+			if (hasMarks) {
+				if (!badge) {
+					badge = element('span', { className: 'stillframe-device-tab__annotated', text: '✏️ Edited' });
+					var info = tab.querySelector('.stillframe-device-tab__info');
+					if (info) info.appendChild(badge);
+				}
+			} else if (badge && badge.parentNode) {
+				badge.parentNode.removeChild(badge);
+			}
+		}
+
+		function switchActiveDevice(targetId) {
+			if (targetId === currentDeviceId && resultReady) return;
+			var targetDev = devicesList.find(function (d) { return d.id === targetId; });
+			if (!targetDev) return;
+
+			// Save annotations of current active device
+			if (editor && currentDevice) {
+				currentDevice.marks = editor.getMarks ? editor.getMarks() : [];
+				updateDeviceAnnotationBadge(currentDevice);
+			}
+
+			// Switch active device
+			currentDeviceId = targetId;
+			currentDevice = targetDev;
+			captured.width = targetDev.width;
+			captured.height = targetDev.height || targetDev.estHeight || 900;
+			captured.scale = targetDev.scale || 1;
+			captured.url = targetDev.url || window.location.href;
+			captured.blob = targetDev.blob;
+
+			// Update tabs
+			devicesList.forEach(function (d) {
+				var tab = tabElements[d.id];
+				if (tab) {
+					tab.classList.toggle('is-active', d.id === targetId);
+					tab.setAttribute('aria-selected', d.id === targetId ? 'true' : 'false');
+				}
+			});
+
+			// Update brand dimensions
+			var dimsEl = win.querySelector('.stillframe-result__dims');
+			if (dimsEl) {
+				dimsEl.textContent = Math.round(captured.width).toLocaleString() + ' × ' + Math.round(captured.height).toLocaleString();
+			}
+
+			if (targetDev.status === 'ready' && targetDev.image) {
+				setResultLoading(false);
+				mountEditor(targetDev.image);
+				if (editor && targetDev.marks && targetDev.marks.length) {
+					editor.setMarks(targetDev.marks);
+				}
+				fitResultImage();
+				resultReady = true;
+				setStatus('');
+			} else if (targetDev.status === 'error') {
+				clearWrap();
+				canvasWrap.appendChild(element('div', {
+					className: 'stillframe-result__loader is-error',
+					text: text('captureFailed') || 'The capture failed for this device.'
+				}));
+				setResultLoading(false);
+				resultReady = false;
+			} else {
+				showLoader('Capturing ' + targetDev.label + ' (' + targetDev.width + 'px)…');
+				setResultLoading(true);
+				resultReady = false;
+			}
+		}
+
+		devicesList.forEach(function (dev) {
+			var tab = element('button', {
+				type: 'button',
+				className: 'stillframe-device-tab' + (dev.id === currentDeviceId ? ' is-active' : ''),
+				role: 'tab',
+				'aria-selected': dev.id === currentDeviceId ? 'true' : 'false'
+			});
+
+			var preview = element('div', { className: 'stillframe-device-tab__preview' });
+			var spin = element('span', { className: 'stillframe-device-tab__spinner' });
+			preview.appendChild(spin);
+			tab.appendChild(preview);
+
+			var info = element('div', { className: 'stillframe-device-tab__info' });
+			info.appendChild(element('span', { className: 'stillframe-device-tab__name', text: dev.label }));
+			info.appendChild(element('span', { className: 'stillframe-device-tab__res', text: dev.width + 'px' }));
+			tab.appendChild(info);
+
+			tab.addEventListener('click', function () {
+				switchActiveDevice(dev.id);
+			});
+
+			tabElements[dev.id] = tab;
+			sidebarList.appendChild(tab);
+		});
+		sidebar.appendChild(sidebarList);
+
+		if (hasMulti) {
+			var sidebarFoot = element('div', { className: 'stillframe-result__sidebar-foot' });
+
+			if (config.canUpload) {
+				var saveAllBtn = element('button', {
+					type: 'button',
+					className: 'stillframe-sidebar-action-btn stillframe-sidebar-action-btn--primary',
+					text: 'Save All to Media'
+				});
+				saveAllBtn.insertBefore(iconSvg('media', 14), saveAllBtn.firstChild);
+				saveAllBtn.addEventListener('click', function () {
+					saveAllDevices(saveAllBtn);
+				});
+				sidebarFoot.appendChild(saveAllBtn);
+			}
+
+			var dlAllBtn = element('button', {
+				type: 'button',
+				className: 'stillframe-sidebar-action-btn',
+				text: 'Download All'
+			});
+			dlAllBtn.insertBefore(iconSvg('download', 14), dlAllBtn.firstChild);
+			dlAllBtn.addEventListener('click', function () {
+				downloadAllDevices(dlAllBtn);
+			});
+			sidebarFoot.appendChild(dlAllBtn);
+
+			sidebar.appendChild(sidebarFoot);
+		}
+
+		function saveAllDevices(btn) {
+			if (!config.canUpload || !config.ajaxUrl || !config.mediaNonce) {
+				setStatus(text('mediaFailed'), '', '', 'error');
+				return;
+			}
+			if (editor && currentDevice) {
+				currentDevice.marks = editor.getMarks ? editor.getMarks() : [];
+				updateDeviceAnnotationBadge(currentDevice);
+			}
+			var readyList = devicesList.filter(function (d) { return d.status === 'ready' && d.image; });
+			if (!readyList.length) {
+				setStatus('Captures are still preparing. Please wait a moment.', '', '', 'busy');
+				return;
+			}
+			if (btn) btn.disabled = true;
+			setStatus('Saving all ' + readyList.length + ' viewports to Media…', '', '', 'busy');
+
+			var flattenPromises = readyList.map(function (d) {
+				if (d === currentDevice && editor) {
+					return exportBlob().then(function (blob) {
+						return { dev: d, blob: blob };
+					});
+				}
+				if ((!d.marks || !d.marks.length) && d.blob) {
+					return Promise.resolve({ dev: d, blob: d.blob });
+				}
+				if (api.flattenImageAndMarks) {
+					return api.flattenImageAndMarks(d.image, d.marks, d.width).then(function (blob) {
+						return { dev: d, blob: blob };
+					});
+				}
+				return Promise.resolve({ dev: d, blob: d.blob });
+			});
+
+			Promise.all(flattenPromises).then(function (items) {
+				return Promise.all(items.map(function (item) {
+					var body = new FormData();
+					body.append('action', 'stillframe_save_media');
+					body.append('nonce', String(config.mediaNonce));
+					var fname = fileNameFor(item.dev.url, item.dev.width, item.dev.scale || 1);
+					body.append('image', item.blob, fname);
+					return window.fetch(String(config.ajaxUrl), {
+						method: 'POST',
+						credentials: 'same-origin',
+						body: body
+					}).then(function (r) { return r.json(); });
+				}));
+			}).then(function () {
+				if (btn) btn.disabled = false;
+				setStatus('Saved all ' + readyList.length + ' devices to Media Library!', '', '', 'success');
+			}).catch(function () {
+				if (btn) btn.disabled = false;
+				setStatus('Some devices could not be saved to Media.', '', '', 'error');
+			});
+		}
+
+		function downloadAllDevices(btn) {
+			if (editor && currentDevice) {
+				currentDevice.marks = editor.getMarks ? editor.getMarks() : [];
+				updateDeviceAnnotationBadge(currentDevice);
+			}
+			var readyList = devicesList.filter(function (d) { return d.status === 'ready' && d.image; });
+			if (!readyList.length) {
+				setStatus('Captures are still preparing. Please wait a moment.', '', '', 'busy');
+				return;
+			}
+			if (btn) btn.disabled = true;
+			setStatus('Preparing ' + readyList.length + ' downloads…', '', '', 'busy');
+
+			var flattenPromises = readyList.map(function (d) {
+				if (d === currentDevice && editor) {
+					return exportBlob().then(function (blob) {
+						return { dev: d, blob: blob };
+					});
+				}
+				if ((!d.marks || !d.marks.length) && d.blob) {
+					return Promise.resolve({ dev: d, blob: d.blob });
+				}
+				if (api.flattenImageAndMarks) {
+					return api.flattenImageAndMarks(d.image, d.marks, d.width).then(function (blob) {
+						return { dev: d, blob: blob };
+					});
+				}
+				return Promise.resolve({ dev: d, blob: d.blob });
+			});
+
+			Promise.all(flattenPromises).then(function (items) {
+				if (btn) btn.disabled = false;
+				items.forEach(function (item, idx) {
+					window.setTimeout(function () {
+						var fname = fileNameFor(item.dev.url, item.dev.width, item.dev.scale || 1);
+						saveBlob(item.blob, fname);
+					}, idx * 180);
+				});
+				setStatus('Downloaded ' + items.length + ' devices.', '', '', 'success');
+			}).catch(function () {
+				if (btn) btn.disabled = false;
+				setStatus(text('downloadFailed') || 'Download failed.', '', '', 'error');
+			});
+		}
+
+		mainBody.appendChild(sidebar);
+		mainBody.appendChild(stage);
+		mainBody.appendChild(drawer);
+
 		win.appendChild(heading);
 		win.appendChild(toolbar);
-		win.appendChild(stage);
+		win.appendChild(mainBody);
 		win.appendChild(statusNode);
 		root.appendChild(win);
 
@@ -1758,45 +2367,98 @@
 			resultObserver.observe(stage);
 		}
 
-		showLoader(text('capturingShort') || 'Capturing…');
-		setResultLoading(true);
-		if (downloadButton) {
-			downloadButton.focus();
+		if (work) {
+			showLoader(text('capturingShort') || 'Capturing…');
+			setResultLoading(true);
+			if (downloadButton) {
+				downloadButton.focus();
+			}
+
+			work.then(function (blob) {
+				if (token !== session || !panel || !blob) {
+					return null;
+				}
+				captured.blob = blob;
+				return loadResultImage(blob);
+			}).then(function (image) {
+				if (!image || token !== session || !panel) {
+					return;
+				}
+				if (image.naturalWidth && image.naturalHeight) {
+					var sc = captured.scale || 1;
+					captured.width = Math.round(image.naturalWidth / sc);
+					captured.height = Math.round(image.naturalHeight / sc);
+					var dimsEl = win.querySelector('.stillframe-result__dims');
+					if (dimsEl) {
+						dimsEl.textContent = captured.width.toLocaleString() + ' × ' + captured.height.toLocaleString();
+					}
+				}
+				mountEditor(image);
+				fitResultImage();
+				resultReady = true;
+				setResultLoading(false);
+				setStatus('');
+				flushPending();
+				if (captured.blob) {
+					saveCaptureToRecent(captured.blob, captured.width, captured.height, document.title, captured.url);
+				}
+			}).catch(function (error) {
+				if (token !== session || !panel) {
+					return;
+				}
+				pendingAction = '';
+				setActionLoading(downloadButton, false);
+				setActionLoading(mediaButton, false);
+				clearWrap();
+				canvasWrap.appendChild(element('div', {
+					className: 'stillframe-result__loader is-error',
+					text: error && error.code === 'library' ? text('libraryMissing') : text('captureFailed')
+				}));
+				setStatus('');
+				if (dialog) {
+					dialog.setAttribute('aria-busy', 'false');
+				}
+			});
+		} else {
+			showLoader('Capturing ' + (currentDevice ? currentDevice.label : '') + '…');
+			setResultLoading(true);
 		}
 
-		work.then(function (blob) {
-			if (token !== session || !panel || !blob) {
-				return null;
+		return {
+			onDeviceReady: function (dev, blob, image) {
+				updateDeviceTabPreview(dev);
+				if (dev.id === currentDeviceId) {
+					captured.blob = blob;
+					captured.width = dev.width;
+					captured.height = dev.height;
+					var dimsEl = win.querySelector('.stillframe-result__dims');
+					if (dimsEl) {
+						dimsEl.textContent = captured.width.toLocaleString() + ' × ' + captured.height.toLocaleString();
+					}
+					mountEditor(image);
+					if (dev.marks && dev.marks.length && editor) {
+						editor.setMarks(dev.marks);
+					}
+					fitResultImage();
+					resultReady = true;
+					setResultLoading(false);
+					setStatus('');
+					flushPending();
+				}
+			},
+			onDeviceError: function (dev) {
+				updateDeviceTabPreview(dev);
+				if (dev.id === currentDeviceId) {
+					clearWrap();
+					canvasWrap.appendChild(element('div', {
+						className: 'stillframe-result__loader is-error',
+						text: text('captureFailed') || 'The capture failed for this device.'
+					}));
+					setResultLoading(false);
+					resultReady = false;
+				}
 			}
-			captured.blob = blob;
-			return loadResultImage(blob);
-		}).then(function (image) {
-			if (!image || token !== session || !panel) {
-				return;
-			}
-			mountEditor(image);
-			fitResultImage();
-			resultReady = true;
-			setResultLoading(false);
-			setStatus('');
-			flushPending();
-		}).catch(function (error) {
-			if (token !== session || !panel) {
-				return;
-			}
-			pendingAction = '';
-			setActionLoading(downloadButton, false);
-			setActionLoading(mediaButton, false);
-			clearWrap();
-			canvasWrap.appendChild(element('div', {
-				className: 'stillframe-result__loader is-error',
-				text: error && error.code === 'library' ? text('libraryMissing') : text('captureFailed')
-			}));
-			setStatus('');
-			if (dialog) {
-				dialog.setAttribute('aria-busy', 'false');
-			}
-		});
+		};
 	}
 
 	function setResultLoading(loading) {
@@ -1820,6 +2482,97 @@
 		} else {
 			syncMarkButtons();
 		}
+	}
+
+	function openMultiDirectCapture(sourceUrl, selectedDevices, scale, hideAdminBar, isFullPage) {
+		var token = ++session;
+		var scaleVal = scale || 1;
+		if (!selectedDevices || !selectedDevices.length) {
+			selectedDevices = [
+				{ id: 'desktop', label: 'Desktop', width: 1440, estHeight: 900, icon: 'desktop' },
+				{ id: 'tablet',  label: 'iPad',    width: 834,  estHeight: 1112, icon: 'tablet' },
+				{ id: 'mobile',  label: 'Mobile',  width: 390,  estHeight: 844,  icon: 'mobile' }
+			];
+		}
+
+		var devices = selectedDevices.map(function (d) {
+			var estH = d.estHeight || (d.width === 390 ? 844 : (d.width === 834 ? 1112 : 900));
+			return {
+				id: d.id,
+				label: d.label,
+				width: d.width,
+				height: estH,
+				estHeight: estH,
+				icon: d.icon || 'desktop',
+				scale: scaleVal,
+				url: sourceUrl,
+				status: 'loading',
+				blob: null,
+				image: null,
+				marks: []
+			};
+		});
+
+		var activeDev = devices[0];
+		var initialRect = {
+			x: 0,
+			y: 0,
+			width: activeDev.width,
+			height: activeDev.estHeight,
+			scale: scaleVal,
+			url: sourceUrl
+		};
+
+		var controller = openResult(initialRect, null, token, {
+			devices: devices,
+			activeDeviceId: activeDev.id
+		});
+
+		// Run captures sequentially
+		var chain = Promise.resolve();
+		devices.forEach(function (dev) {
+			chain = chain.then(function () {
+				if (token !== session) {
+					return Promise.reject(new Error('cancelled'));
+				}
+				return captureInFrame(sourceUrl, dev.width, scaleVal, function () {
+					return token !== session;
+				}, {
+					fullPage: !!isFullPage,
+					hideAdminBar: !!hideAdminBar
+				}).then(function (blob) {
+					if (token !== session || !blob) {
+						return;
+					}
+					dev.blob = blob;
+					return loadResultImage(blob).then(function (img) {
+						if (token !== session) return;
+						dev.image = img;
+						dev.status = 'ready';
+						dev.height = Math.round(img.naturalHeight / scaleVal);
+						controller.onDeviceReady(dev, blob, img);
+						saveCaptureToRecent(blob, dev.width, dev.height, document.title + ' (' + dev.label + ')', sourceUrl);
+					});
+				}).catch(function (err) {
+					if (token !== session) return;
+					dev.status = 'error';
+					controller.onDeviceError(dev);
+				});
+			});
+		});
+	}
+
+	function openDirectCaptureResult(sourceUrl, width, scale, hideAdminBar) {
+		var dLabel = width === 390 ? 'Mobile' : (width === 834 ? 'iPad' : 'Desktop');
+		var dIcon = width === 390 ? 'mobile' : (width === 834 ? 'tablet' : 'desktop');
+		var dHeight = width === 390 ? 844 : (width === 834 ? 1112 : 900);
+		openMultiDirectCapture(sourceUrl, [{
+			id: 'dev_' + width,
+			label: dLabel,
+			width: width,
+			estHeight: dHeight,
+			icon: dIcon
+		}], scale, hideAdminBar);
 	}
 
 	function openSnip() {
@@ -1905,6 +2658,11 @@
 			rectButton.setAttribute('aria-pressed', next === 'rect' ? 'true' : 'false');
 			windowModeButton.setAttribute('aria-pressed', next === 'window' ? 'true' : 'false');
 			fullButton.setAttribute('aria-pressed', 'false');
+			if (devMenu) {
+				devMenu.hidden = true;
+				devButton.setAttribute('aria-expanded', 'false');
+				root.classList.remove('has-menu-open');
+			}
 			showSelection(null);
 			setHint();
 		}
@@ -1942,6 +2700,470 @@
 				height: sizeNow.height
 			});
 		});
+
+		function closeAllMenus() {
+			if (devMenu && !devMenu.hidden) {
+				devMenu.hidden = true;
+				devButton.setAttribute('aria-expanded', 'false');
+			}
+			if (directMenu && !directMenu.hidden) {
+				directMenu.hidden = true;
+				directButton.setAttribute('aria-expanded', 'false');
+			}
+			if (recentMenu && !recentMenu.hidden) {
+				recentMenu.hidden = true;
+				recentButton.setAttribute('aria-expanded', 'false');
+			}
+			root.classList.remove('has-menu-open');
+			if (!sel) {
+				hint.hidden = false;
+				hint.style.display = '';
+			}
+		}
+
+		// --- Section A: Devices Button & Menu (Only Framed Viewports!) ---
+		var devWrap = element('div', { className: 'stillframe-snip__devices-wrap' });
+		var devButton = iconButton('devices', text('devices') || 'Devices', 'stillframe-snip__mode', true);
+		var devChevron = iconSvg('chevronDown', 11);
+		devChevron.classList.add('stillframe-snip__chevron');
+		devButton.appendChild(devChevron);
+
+		var devMenu = element('div', { className: 'stillframe-snip__devices-menu' });
+		devMenu.hidden = true;
+
+		var sec1Title = element('div', { className: 'stillframe-hub-sec-title', text: 'Frame on Screen' });
+		var sec1Grid = element('div', { className: 'stillframe-hub-presets-grid' });
+
+		var devPresets = [
+			{ id: 'desktop', width: 1440, height: 900, label: 'Desktop', badge: '1440px', icon: 'desktop' },
+			{ id: 'tablet', width: 834, height: 1112, label: 'iPad', badge: '834px', icon: 'tablet' },
+			{ id: 'mobile', width: 390, height: 844, label: 'Mobile', badge: '390px', icon: 'mobile' }
+		];
+
+		devPresets.forEach(function (d) {
+			var devItem = element('button', {
+				type: 'button',
+				className: 'stillframe-hub-preset-btn',
+				title: 'Frame screen at ' + d.label + ' (' + d.width + ' × ' + d.height + ')'
+			});
+			devItem.appendChild(iconSvg(d.icon, 16));
+			devItem.appendChild(element('span', { className: 'stillframe-hub-preset-label', text: d.label }));
+			devItem.appendChild(element('span', { className: 'stillframe-hub-preset-badge', text: d.badge }));
+			devItem.addEventListener('click', function (e) {
+				stopBar(e);
+				closeAllMenus();
+				hint.hidden = true;
+				hint.style.display = 'none';
+
+				var winW = window.innerWidth || document.documentElement.clientWidth || 1024;
+				var winH = window.innerHeight || document.documentElement.clientHeight || 768;
+				var targetW = Math.min(d.width, Math.max(200, winW - 32));
+				var targetH = Math.min(d.height, Math.max(200, winH - 120));
+				var targetX = Math.max(16, Math.round((winW - targetW) / 2));
+				var targetY = Math.max(64, Math.round((winH - targetH) / 2));
+
+				sel = {
+					x: targetX,
+					y: targetY,
+					width: targetW,
+					height: targetH
+				};
+				mode = 'rect';
+				root.setAttribute('data-mode', 'rect');
+				rectButton.setAttribute('aria-pressed', 'true');
+				windowModeButton.setAttribute('aria-pressed', 'false');
+				fullButton.setAttribute('aria-pressed', 'false');
+				showSelection(sel);
+				scheduleShot(IDLE_BEFORE_RENDER_MS);
+			});
+			sec1Grid.appendChild(devItem);
+		});
+
+		var devFooter = element('div', { className: 'stillframe-hub-footer' });
+		var devStudioLink = element('a', {
+			href: (config && config.toolsUrl) || '/wp-admin/tools.php?page=stillframe',
+			className: 'stillframe-snip__dev-link',
+			text: 'Multi-Device Studio (Batch Export)'
+		});
+		devStudioLink.appendChild(iconSvg('arrow', 12));
+		devStudioLink.addEventListener('click', function () {
+			destroySnip();
+		});
+		devFooter.appendChild(devStudioLink);
+
+		devMenu.appendChild(sec1Title);
+		devMenu.appendChild(sec1Grid);
+		devMenu.appendChild(devFooter);
+
+		function toggleMenu(menu, button, onOpen) {
+			var wasOpen = !menu.hidden;
+			closeAllMenus();
+			if (!wasOpen) {
+				menu.hidden = false;
+				button.setAttribute('aria-expanded', 'true');
+				root.classList.add('has-menu-open');
+				hint.hidden = true;
+				hint.style.display = 'none';
+				if (onOpen) onOpen();
+			}
+		}
+
+		devButton.addEventListener('click', function (event) {
+			stopBar(event);
+			toggleMenu(devMenu, devButton);
+		});
+
+		devWrap.appendChild(devButton);
+		devWrap.appendChild(devMenu);
+
+		// --- Section B: Direct Page Button & Menu ---
+		var directWrap = element('div', { className: 'stillframe-snip__direct-wrap' });
+		var directButton = iconButton('page', text('directPage') || 'Direct Page', 'stillframe-snip__mode', true);
+		var directChevron = iconSvg('chevronDown', 11);
+		directChevron.classList.add('stillframe-snip__chevron');
+		directButton.appendChild(directChevron);
+
+		var directMenu = element('div', { className: 'stillframe-snip__direct-menu' });
+		directMenu.hidden = true;
+
+		var directTitle = element('div', { className: 'stillframe-hub-sec-title', text: 'Direct Page Capture' });
+
+		// Page Select
+		var hubPageWrap = element('div', { className: 'stillframe-hub-field' });
+		hubPageWrap.appendChild(element('label', { className: 'stillframe-hub-label', text: 'Target Page' }));
+		var hubPageSelect = element('select', { className: 'stillframe-hub-select' });
+
+		var isAdmin = window.location.pathname.indexOf('/wp-admin') !== -1;
+		var curPath = window.location.pathname;
+		var home = (config && config.homeUrl) || '/';
+
+		if (isAdmin) {
+			var optHome = element('option', { value: home, text: 'Home Page' });
+			optHome.selected = true;
+			hubPageSelect.appendChild(optHome);
+			if (config && Array.isArray(config.sitePages)) {
+				config.sitePages.forEach(function (p) {
+					if (p.url && p.url !== home) {
+						hubPageSelect.appendChild(element('option', { value: p.url, text: (p.title || 'Page') + ' (' + p.type + ')' }));
+					}
+				});
+			}
+			hubPageSelect.appendChild(element('option', { value: '__current__', text: 'Current Admin Screen (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')' }));
+		} else {
+			var curOpt = element('option', { value: '__current__', text: 'Current Screen (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')' });
+			curOpt.selected = true;
+			hubPageSelect.appendChild(curOpt);
+			if (config && config.homeUrl && window.location.href !== config.homeUrl) {
+				hubPageSelect.appendChild(element('option', { value: config.homeUrl, text: 'Home Page' }));
+			}
+			if (config && Array.isArray(config.sitePages)) {
+				config.sitePages.forEach(function (p) {
+					if (p.url && p.url !== window.location.href && p.url !== config.homeUrl) {
+						hubPageSelect.appendChild(element('option', { value: p.url, text: (p.title || 'Page') + ' (' + p.type + ')' }));
+					}
+				});
+			}
+		}
+		hubPageSelect.appendChild(element('option', { value: '__custom__', text: 'Custom URL...' }));
+		hubPageWrap.appendChild(hubPageSelect);
+
+		var hubCustomWrap = element('div', { className: 'stillframe-hub-custom-wrap' });
+		hubCustomWrap.style.display = 'none';
+		var hubCustomInput = element('input', { type: 'url', className: 'stillframe-hub-input', placeholder: 'https://example.com/' });
+		hubCustomWrap.appendChild(hubCustomInput);
+		hubPageWrap.appendChild(hubCustomWrap);
+
+		hubPageSelect.addEventListener('change', function () {
+			hubCustomWrap.style.display = hubPageSelect.value === '__custom__' ? 'block' : 'none';
+			if (hubPageSelect.value === '__custom__') {
+				hubCustomInput.focus();
+			}
+		});
+
+		// Multi-Device Selection Cards (Desktop, iPad, Mobile)
+		var hubDevGroup = element('div', { className: 'stillframe-dev-cards-group' });
+		var hubDevHeader = element('div', { className: 'stillframe-dev-cards-header' });
+		hubDevHeader.appendChild(element('span', { className: 'stillframe-dev-cards-title', text: 'Select Devices to Capture' }));
+
+		var hubDevQuickToggle = element('button', {
+			type: 'button',
+			className: 'stillframe-dev-cards-quick',
+			text: 'Desktop Only'
+		});
+		hubDevHeader.appendChild(hubDevQuickToggle);
+		hubDevGroup.appendChild(hubDevHeader);
+
+		var hubDevGrid = element('div', { className: 'stillframe-dev-cards-grid' });
+
+		var availableDevices = [
+			{ id: 'desktop', label: 'Desktop', width: 1440, estHeight: 900, icon: 'desktop', badge: '1440px' },
+			{ id: 'tablet',  label: 'iPad',    width: 834,  estHeight: 1112, icon: 'tablet',  badge: '834px' },
+			{ id: 'mobile',  label: 'Mobile',  width: 390,  estHeight: 844,  icon: 'mobile',  badge: '390px' }
+		];
+
+		var devCards = {};
+		availableDevices.forEach(function (d) {
+			var card = element('div', {
+				className: 'stillframe-dev-card is-selected',
+				tabIndex: 0,
+				role: 'checkbox',
+				'aria-checked': 'true',
+				title: 'Toggle ' + d.label + ' (' + d.badge + ')'
+			});
+
+			var checkBadge = element('span', { className: 'stillframe-dev-card__check' });
+			checkBadge.appendChild(iconSvg('check', 10));
+			card.appendChild(checkBadge);
+
+			var iconEl = iconSvg(d.icon, 20);
+			iconEl.classList.add('stillframe-dev-card__icon');
+			card.appendChild(iconEl);
+
+			card.appendChild(element('span', { className: 'stillframe-dev-card__name', text: d.label }));
+			card.appendChild(element('span', { className: 'stillframe-dev-card__dim', text: d.badge }));
+
+			function toggleCard() {
+				var countSelected = Object.keys(devCards).filter(function (k) {
+					return devCards[k].classList.contains('is-selected');
+				}).length;
+
+				if (card.classList.contains('is-selected')) {
+					if (countSelected > 1) {
+						card.classList.remove('is-selected');
+						card.setAttribute('aria-checked', 'false');
+					}
+				} else {
+					card.classList.add('is-selected');
+					card.setAttribute('aria-checked', 'true');
+				}
+				updateSubmitLabel();
+			}
+
+			card.addEventListener('click', function (e) {
+				stopBar(e);
+				toggleCard();
+			});
+			card.addEventListener('keydown', function (e) {
+				if (e.key === ' ' || e.key === 'Enter') {
+					e.preventDefault();
+					toggleCard();
+				}
+			});
+
+			devCards[d.id] = card;
+			hubDevGrid.appendChild(card);
+		});
+		hubDevGroup.appendChild(hubDevGrid);
+
+		hubDevQuickToggle.addEventListener('click', function (e) {
+			stopBar(e);
+			var allSelected = availableDevices.every(function (d) {
+				return devCards[d.id].classList.contains('is-selected');
+			});
+			availableDevices.forEach(function (d) {
+				var card = devCards[d.id];
+				if (allSelected) {
+					if (d.id === 'desktop') {
+						card.classList.add('is-selected');
+						card.setAttribute('aria-checked', 'true');
+					} else {
+						card.classList.remove('is-selected');
+						card.setAttribute('aria-checked', 'false');
+					}
+				} else {
+					card.classList.add('is-selected');
+					card.setAttribute('aria-checked', 'true');
+				}
+			});
+			updateSubmitLabel();
+		});
+
+		// Admin Bar Option
+		var hubAdminLabel = element('label', { className: 'stillframe-hub-toggle' });
+		var hubAdminCb = element('input', { type: 'checkbox' });
+		hubAdminCb.checked = true;
+		hubAdminLabel.appendChild(hubAdminCb);
+		hubAdminLabel.appendChild(element('span', { text: 'Hide WordPress Admin Bar' }));
+
+		// Resolution Quality - pill selector (1x / 2x / 3x)
+		var hubResField = element('div', { className: 'stillframe-hub-field' });
+		hubResField.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Resolution Quality' }));
+		var hubResRow = element('div', { className: 'stillframe-hub-res-row' });
+		var hubResOptions = [
+			{ value: '1', label: '1x Standard' },
+			{ value: '2', label: '2x Retina', default: true },
+			{ value: '3', label: '3x Ultra' }
+		];
+		var hubResSelected = '2';
+		hubResOptions.forEach(function (opt) {
+			var pill = element('button', {
+				type: 'button',
+				className: 'stillframe-hub-pill' + (opt.default ? ' is-active' : ''),
+				text: opt.label,
+				'data-value': opt.value
+			});
+			pill.addEventListener('click', function (e) {
+				stopBar(e);
+				hubResSelected = opt.value;
+				Array.prototype.forEach.call(hubResRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
+					p.classList.toggle('is-active', p === pill);
+				});
+			});
+			hubResRow.appendChild(pill);
+		});
+		hubResField.appendChild(hubResRow);
+
+		// Capture Height - pill selector (Viewport / Full Page)
+		var hubHeightField = element('div', { className: 'stillframe-hub-field' });
+		hubHeightField.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Capture Height' }));
+		var hubHeightRow = element('div', { className: 'stillframe-hub-res-row' });
+		var hubHeightOptions = [
+			{ value: 'viewport', label: 'Viewport', default: true },
+			{ value: 'fullpage', label: 'Full Page' }
+		];
+		var hubHeightSelected = 'viewport';
+		hubHeightOptions.forEach(function (opt) {
+			var pill = element('button', {
+				type: 'button',
+				className: 'stillframe-hub-pill' + (opt.default ? ' is-active' : ''),
+				text: opt.label,
+				'data-value': opt.value
+			});
+			pill.addEventListener('click', function (e) {
+				stopBar(e);
+				hubHeightSelected = opt.value;
+				Array.prototype.forEach.call(hubHeightRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
+					p.classList.toggle('is-active', p === pill);
+				});
+			});
+			hubHeightRow.appendChild(pill);
+		});
+		hubHeightField.appendChild(hubHeightRow);
+
+		// Capture Button (NO lightning emoji! Uses clean camera SVG icon)
+		var hubSubmit = element('button', {
+			type: 'button',
+			className: 'stillframe-hub-submit'
+		});
+		hubSubmit.appendChild(iconSvg('camera', 16));
+		var hubSubmitText = element('span', { text: 'Capture All 3 Devices & Open' });
+		hubSubmit.appendChild(hubSubmitText);
+
+		function updateSubmitLabel() {
+			var selected = availableDevices.filter(function (d) {
+				return devCards[d.id].classList.contains('is-selected');
+			});
+			if (selected.length === 3) {
+				hubSubmitText.textContent = 'Capture All 3 Devices & Open';
+				hubDevQuickToggle.textContent = 'Desktop Only';
+			} else if (selected.length === 2) {
+				hubSubmitText.textContent = 'Capture ' + selected.length + ' Devices & Open';
+				hubDevQuickToggle.textContent = 'Select All (3)';
+			} else if (selected.length === 1) {
+				hubSubmitText.textContent = 'Capture ' + selected[0].label + ' & Open';
+				hubDevQuickToggle.textContent = 'Select All (3)';
+			}
+		}
+
+		hubSubmit.addEventListener('click', function (e) {
+			stopBar(e);
+			var targetUrl;
+			if (hubPageSelect.value === '__custom__') {
+				targetUrl = hubCustomInput.value.trim();
+				if (!targetUrl) {
+					hubCustomInput.focus();
+					return;
+				}
+			} else if (hubPageSelect.value === '__current__') {
+				targetUrl = captureTargetUrl();
+			} else {
+				targetUrl = hubPageSelect.value;
+			}
+
+			var selected = availableDevices.filter(function (d) {
+				return devCards[d.id].classList.contains('is-selected');
+			});
+			if (!selected.length) {
+				selected = availableDevices;
+			}
+
+			var targetScale = parseInt(hubResSelected, 10) || 2;
+			var hideAdmin = hubAdminCb.checked;
+			var isFullPage = hubHeightSelected === 'fullpage';
+
+			destroySnip();
+			openMultiDirectCapture(targetUrl, selected, targetScale, hideAdmin, isFullPage);
+		});
+
+		var directFooter = element('div', { className: 'stillframe-hub-footer' });
+		var directStudioLink = element('a', {
+			href: (config && config.toolsUrl) || '/wp-admin/tools.php?page=stillframe',
+			className: 'stillframe-snip__dev-link',
+			text: 'Multi-Device Studio (Batch Export)'
+		});
+		directStudioLink.appendChild(iconSvg('arrow', 12));
+		directStudioLink.addEventListener('click', function () {
+			destroySnip();
+		});
+		directFooter.appendChild(directStudioLink);
+
+		directMenu.appendChild(directTitle);
+		directMenu.appendChild(hubPageWrap);
+		directMenu.appendChild(hubDevGroup);
+		directMenu.appendChild(hubAdminLabel);
+		directMenu.appendChild(hubResField);
+		directMenu.appendChild(hubHeightField);
+		directMenu.appendChild(hubSubmit);
+		directMenu.appendChild(directFooter);
+
+		directButton.addEventListener('click', function (event) {
+			stopBar(event);
+			toggleMenu(directMenu, directButton);
+		});
+
+		directWrap.appendChild(directButton);
+		directWrap.appendChild(directMenu);
+
+		// --- Section C: Recent Screenshots Button & Menu ---
+		var recentWrap = element('div', { className: 'stillframe-snip__recent-wrap' });
+		var recentButton = iconButton('recent', text('recent') || 'Recent', 'stillframe-snip__mode', true);
+		var recentChevron = iconSvg('chevronDown', 11);
+		recentChevron.classList.add('stillframe-snip__chevron');
+		recentButton.appendChild(recentChevron);
+
+		var recentMenu = element('div', { className: 'stillframe-snip__recent-menu' });
+		recentMenu.hidden = true;
+
+		var recentHead = element('div', { className: 'stillframe-hub-sec-title', text: 'Recent Screenshots' });
+		var recentBody = element('div', { className: 'stillframe-recent-menu-body' });
+		recentMenu.appendChild(recentHead);
+		recentMenu.appendChild(recentBody);
+
+		recentButton.addEventListener('click', function (event) {
+			stopBar(event);
+			toggleMenu(recentMenu, recentButton, function () {
+				renderRecentList(recentBody, function (item) {
+					destroySnip();
+					openRecentCaptureInEditor(item);
+				});
+			});
+		});
+
+		recentWrap.appendChild(recentButton);
+		recentWrap.appendChild(recentMenu);
+
+		function onDocPointerDown(event) {
+			if (
+				(devWrap && devWrap.contains(event.target)) ||
+				(directWrap && directWrap.contains(event.target)) ||
+				(recentWrap && recentWrap.contains(event.target))
+			) {
+				return;
+			}
+			closeAllMenus();
+		}
+		document.addEventListener('pointerdown', onDocPointerDown, true);
+
 		cancelButton.addEventListener('click', function (event) {
 			stopBar(event);
 			cancelSnip();
@@ -1951,6 +3173,9 @@
 		bar.appendChild(rectButton);
 		bar.appendChild(windowModeButton);
 		bar.appendChild(fullButton);
+		bar.appendChild(devWrap);
+		bar.appendChild(directWrap);
+		bar.appendChild(recentWrap);
 		bar.appendChild(sep);
 		bar.appendChild(cancelButton);
 		setHint();
@@ -2003,11 +3228,16 @@
 		function positionActions(rect) {
 			var width = actions.offsetWidth || 180;
 			var height = actions.offsetHeight || 38;
-			var top = rect.y + rect.height + 8;
-			if (top > window.innerHeight - height - 8) {
-				top = Math.max(8, rect.y - height - 8);
+			var top;
+			// If actions fits comfortably below the box, place it 8px below
+			if (rect.y + rect.height + height + 12 <= window.innerHeight) {
+				top = rect.y + rect.height + 8;
+			} else {
+				// Otherwise place it inside the bottom edge of the box
+				top = Math.max(80, rect.y + rect.height - height - 12);
 			}
-			var left = Math.min(Math.max(8, rect.x + rect.width - width), Math.max(8, window.innerWidth - width - 8));
+			// Center horizontally relative to the selection box, constrained within viewport
+			var left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.x + Math.round((rect.width - width) / 2)));
 			actions.style.transform = 'translate3d(' + left + 'px,' + top + 'px,0)';
 		}
 
@@ -2094,6 +3324,7 @@
 
 		shade.addEventListener('pointerdown', function (event) {
 			touch();
+			closeAllMenus();
 			if (snipBusy || event.button !== 0) {
 				return;
 			}
@@ -2209,6 +3440,7 @@
 				return;
 			}
 			touch();
+			closeAllMenus();
 			event.preventDefault();
 			event.stopPropagation();
 			var handle = event.target && event.target.getAttribute ? event.target.getAttribute('data-h') : null;
@@ -2299,6 +3531,7 @@
 			window.clearTimeout(restartTimer);
 			window.removeEventListener('scroll', onViewChange, true);
 			window.removeEventListener('resize', onViewChange);
+			document.removeEventListener('pointerdown', onDocPointerDown, true);
 		};
 
 		// Render the page in the background while the user chooses, so the
@@ -2306,7 +3539,8 @@
 		scheduleShot(IDLE_BEFORE_RENDER_MS);
 	}
 
-	function captureInFrame(url, width, scale, isCancelled) {
+	function captureInFrame(url, width, scale, isCancelled, options) {
+		options = options || {};
 		return new Promise(function (resolve, reject) {
 			var local = element('iframe', {
 				className: 'stillframe-capture-frame',
@@ -2412,7 +3646,7 @@
 				shooting = true;
 				armTimeout(20000);
 				try {
-					prepareAndShoot(local, scale).then(function (blob) {
+					prepareAndShoot(local, scale, options).then(function (blob) {
 						if (isCancelled()) {
 							var cancelledLater = new Error('cancelled');
 							cancelledLater.code = 'cancelled';
@@ -2996,4 +4230,24 @@
 			window.alert(text('captureFailed') || 'The capture failed. The page was not changed.');
 		}
 	};
+
+	api.captureUrl = function (url, width, scale, options) {
+		return captureInFrame(url, width, scale, function () { return false; }, options || {});
+	};
+
+	api.openBlobInEditor = function (blob, width, height, scale) {
+		if (!blob) return;
+		var token = ++session;
+		var rect = {
+			x: 0,
+			y: 0,
+			width: width || 1440,
+			height: height || 900,
+			scale: scale || 1,
+			url: window.location.href
+		};
+		openResult(rect, Promise.resolve(blob), token);
+	};
+
+	api.openResult = openResult;
 })();

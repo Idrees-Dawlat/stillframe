@@ -88,6 +88,9 @@ class Stillframe_Asset_Loader {
 			'canUpload'     => current_user_can( 'upload_files' ),
 			'minWidth'     => 320,
 			'maxWidth'     => 2560,
+			'homeUrl'      => home_url( '/' ),
+			'sitePages'    => $this->site_pages(),
+			'toolsUrl'     => admin_url( 'tools.php?page=stillframe' ),
 			'stripArgs'    => self::STRIPPED_QUERY_ARGS,
 			'i18n'         => $this->script_strings(),
 		);
@@ -98,6 +101,51 @@ class Stillframe_Asset_Loader {
 			'before'
 		);
 
+		if ( $this->is_tools_screen() ) {
+			wp_enqueue_style( 'stillframe-capture-panel' );
+			wp_register_style(
+				'stillframe-tools',
+				$base . 'assets/css/stillframe-tools.css',
+				array(),
+				STILLFRAME_VERSION
+			);
+			wp_enqueue_style( 'stillframe-tools' );
+
+			wp_register_script(
+				'stillframe-modern-screenshot',
+				$base . 'assets/js/vendor/modern-screenshot.js',
+				array(),
+				STILLFRAME_VERSION,
+				true
+			);
+			wp_enqueue_script( 'stillframe-modern-screenshot' );
+			wp_enqueue_script( 'stillframe-annotation-editor' );
+			wp_enqueue_script( 'stillframe-capture-panel' );
+
+			wp_register_script(
+				'stillframe-tools',
+				$base . 'assets/js/stillframe-tools.js',
+				array( 'stillframe-capture-panel', 'stillframe-modern-screenshot' ),
+				STILLFRAME_VERSION,
+				true
+			);
+			wp_enqueue_script( 'stillframe-tools' );
+
+			$tools_data = array(
+				'homeUrl'    => home_url( '/' ),
+				'siteName'   => sanitize_file_name( get_bloginfo( 'name' ) ? get_bloginfo( 'name' ) : 'site' ),
+				'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+				'mediaNonce' => wp_create_nonce( 'stillframe_save_media' ),
+				'canUpload'  => current_user_can( 'upload_files' ),
+				'pages'      => $this->site_pages(),
+			);
+			wp_add_inline_script(
+				'stillframe-tools',
+				'window.StillframeToolsData = ' . wp_json_encode( $tools_data ) . ';',
+				'before'
+			);
+		}
+
 		/**
 		 * Fires when Stillframe has prepared the capture panel for an administrator.
 		 *
@@ -105,6 +153,36 @@ class Stillframe_Asset_Loader {
 		 * Stillframe does not print the panel from PHP.
 		 */
 		do_action( 'stillframe_capture_panel_rendered' );
+	}
+
+	/**
+	 * Retrieve a list of published pages and posts for quick selection.
+	 *
+	 * @return array<int, array{id: int, title: string, type: string, url: string}>
+	 */
+	private function site_pages() {
+		$items = array();
+		$pages = get_posts(
+			array(
+				'post_type'      => array( 'page', 'post' ),
+				'post_status'    => 'publish',
+				'posts_per_page' => 25,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			)
+		);
+		foreach ( $pages as $p ) {
+			$permalink = get_permalink( $p );
+			if ( $permalink ) {
+				$items[] = array(
+					'id'    => (int) $p->ID,
+					'title' => $p->post_title ? $p->post_title : __( '(No title)', 'stillframe' ),
+					'type'  => $p->post_type,
+					'url'   => $permalink,
+				);
+			}
+		}
+		return $items;
 	}
 
 	/**
@@ -307,6 +385,9 @@ class Stillframe_Asset_Loader {
 			'more'            => __( 'More', 'stillframe' ),
 			'topBarHelp'      => __( 'Include the top bar', 'stillframe' ),
 			'sideMenuHelp'    => __( 'Include the side menu', 'stillframe' ),
+			'directPage'      => __( 'Direct Page', 'stillframe' ),
+			'recent'          => __( 'Recent', 'stillframe' ),
+			'devices'         => __( 'Devices', 'stillframe' ),
 		);
 	}
 

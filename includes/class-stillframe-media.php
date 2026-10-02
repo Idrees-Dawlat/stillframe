@@ -56,7 +56,7 @@ class Stillframe_Media {
 		}
 
 		$size = (int) $file['size'];
-		if ( $size < 1 || $size > 12 * MB_IN_BYTES ) {
+		if ( $size < 1 || $size > 32 * MB_IN_BYTES ) {
 			$this->fail();
 		}
 

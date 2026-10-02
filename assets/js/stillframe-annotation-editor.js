@@ -101,6 +101,35 @@
 		ctx.restore();
 	}
 
+	api.flattenImageAndMarks = function (image, marksList, displayWidth) {
+		return new Promise(function (resolve, reject) {
+			if (!image || !image.naturalWidth || !image.naturalHeight) {
+				reject(new Error('image'));
+				return;
+			}
+			var exportCanvas = document.createElement('canvas');
+			exportCanvas.width = image.naturalWidth;
+			exportCanvas.height = image.naturalHeight;
+			var ctx = exportCanvas.getContext('2d');
+			if (!ctx) {
+				reject(new Error('canvas'));
+				return;
+			}
+			ctx.drawImage(image, 0, 0, exportCanvas.width, exportCanvas.height);
+			var unit = displayWidth ? (image.naturalWidth / displayWidth) : 1;
+			(marksList || []).forEach(function (mark) {
+				drawMark(ctx, mark, exportCanvas.width, exportCanvas.height, unit);
+			});
+			exportCanvas.toBlob(function (blob) {
+				if (!blob) {
+					reject(new Error('blob'));
+					return;
+				}
+				resolve(blob);
+			}, 'image/png');
+		});
+	};
+
 	api.createAnnotationEditor = function (wrap, image, options) {
 		var settings = options || {};
 		var marks = [];
@@ -293,6 +322,23 @@
 			},
 			hasMarks: function () {
 				return marks.length > 0;
+			},
+			getMarks: function () {
+				try {
+					return JSON.parse(JSON.stringify(marks));
+				} catch (e) {
+					return marks.slice();
+				}
+			},
+			setMarks: function (newMarks) {
+				try {
+					marks = Array.isArray(newMarks) ? JSON.parse(JSON.stringify(newMarks)) : [];
+				} catch (e) {
+					marks = Array.isArray(newMarks) ? newMarks.slice() : [];
+				}
+				drawing = null;
+				redraw();
+				notify();
 			},
 			flatten: function () {
 				return new Promise(function (resolve, reject) {
