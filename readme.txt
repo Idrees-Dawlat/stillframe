@@ -12,6 +12,8 @@ Multi-device screenshot capture, responsive previews, and markup studio for Word
 
 == Description ==
 
+![Stillframe Walkthrough](https://ps.w.org/stillframe/assets/walkthrough.gif)
+
 Stillframe lets you take screenshots of your WordPress admin area or front-end pages directly inside your browser. Capture responsive desktop, tablet, and mobile views, mark them up with rich annotation tools, and save them straight to your Media Library or download high-resolution PNGs.
 
 ### Multi-Device Studio (Tools > Stillframe)
