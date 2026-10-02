@@ -406,7 +406,15 @@
 			return;
 		}
 		editor = api.createAnnotationEditor(canvasWrap, image, {
-			onChange: syncMarkButtons
+			onChange: syncMarkButtons,
+			onToolChange: function (name) {
+				if (!panel) {
+					return;
+				}
+				Array.prototype.forEach.call(panel.querySelectorAll('.stillframe-tool'), function (button) {
+					button.setAttribute('aria-pressed', button.getAttribute('data-tool') === name ? 'true' : 'false');
+				});
+			}
 		});
 		editor.setTool('pen');
 		editor.setColor(toolColor);
@@ -1509,6 +1517,9 @@
 		arrow: [
 			{ d: 'M5 19L18.5 5.5M9.5 5h9.5v9.5' }
 		],
+		select: [
+			{ d: 'M6 3.5l12 6.3-5.2 1.7L10.6 17z' }
+		],
 		rect: [
 			{ tag: 'rect', x: '4', y: '6', width: '16', height: '12', rx: '1.5' }
 		],
@@ -1918,6 +1929,7 @@
 			return button;
 		}
 
+		addTool('select', text('select') || 'Select and move', 'v', false);
 		penButton = addTool('pen', text('pen') || 'Pen', 'p', true);
 		addTool('circle', text('circle') || 'Circle', 'c', false);
 		addTool('arrow', text('arrow') || 'Arrow', 'a', false);
@@ -2388,7 +2400,19 @@
 			if (event.key === 'Escape') {
 				event.preventDefault();
 				event.stopPropagation();
+				if (editor && editor.clearSelection && editor.clearSelection()) {
+					return;
+				}
 				api.closePanel();
+				return;
+			}
+			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
+				// Nothing in the editor should be selectable as page text.
+				event.preventDefault();
+				return;
+			}
+			if ((event.key === 'Delete' || event.key === 'Backspace') && editor && editor.deleteSelected && editor.deleteSelected()) {
+				event.preventDefault();
 				return;
 			}
 			if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z') && !event.shiftKey) {
@@ -2837,6 +2861,12 @@
 			var wasOpen = !menu.hidden;
 			closeAllMenus();
 			if (!wasOpen) {
+				if (sel || box.classList.contains('is-adjusting') || !box.hidden) {
+					// A dropdown starts a new choice, so any leftover selection goes away.
+					clearSelection();
+					fullButton.setAttribute('aria-pressed', 'false');
+					rectButton.setAttribute('aria-pressed', mode === 'rect' ? 'true' : 'false');
+				}
 				menu.hidden = false;
 				button.setAttribute('aria-expanded', 'true');
 				root.classList.add('has-menu-open');
@@ -3536,6 +3566,10 @@
 
 		snipKeyHandler = function (event) {
 			if (!snip) {
+				return;
+			}
+			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A') && !/^(INPUT|TEXTAREA|SELECT)$/.test((event.target && event.target.tagName) || '')) {
+				event.preventDefault();
 				return;
 			}
 			if (event.key === 'Enter' && sel && !snipBusy) {

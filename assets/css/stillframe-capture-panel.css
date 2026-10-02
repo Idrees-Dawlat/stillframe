@@ -1715,3 +1715,133 @@ body.stillframe-locked {
 		animation-duration: 2s;
 	}
 }
+
+/* Neutral accents ------------------------------------------------------- */
+/* The brand colour is reserved for primary buttons (Capture, Download, Save).
+   Selected and active states use plain greys so nothing else competes. */
+
+.stillframe-snip,
+.stillframe-result {
+	--sf-ink: #1f2937;
+	--sf-pick-bg: #f3f4f6;
+	--sf-pick-line: #9ca3af;
+}
+
+.stillframe-snip button:focus-visible,
+.stillframe-result button:focus-visible {
+	outline-color: var(--sf-ink);
+}
+
+.stillframe-snip__handle,
+.stillframe-snip__handle:hover {
+	border-color: var(--sf-ink);
+}
+
+.stillframe-snip__bar button[aria-pressed="true"],
+.stillframe-snip.has-menu-open .stillframe-snip__bar button[aria-expanded="true"] {
+	color: var(--sf-ink);
+	background: var(--sf-pick-bg);
+	border-color: transparent;
+}
+
+.stillframe-dev-cards-quick:hover {
+	color: var(--sf-ink);
+}
+
+.stillframe-dev-card.is-selected {
+	background: var(--sf-subtle);
+	border-color: var(--sf-ink);
+}
+
+.stillframe-dev-card.is-selected .stillframe-dev-card__check {
+	background: var(--sf-ink);
+	border-color: var(--sf-ink);
+}
+
+.stillframe-dev-card.is-selected .stillframe-dev-card__icon {
+	color: var(--sf-ink);
+}
+
+.stillframe-dev-card.is-selected .stillframe-dev-card__dim {
+	color: var(--sf-muted);
+}
+
+.stillframe-hub-pill.is-active,
+.stillframe-hub-pill.is-active:hover {
+	background: var(--sf-pick-bg);
+	border-color: var(--sf-ink);
+	color: var(--sf-ink);
+}
+
+.stillframe-hub-select:focus,
+.stillframe-hub-input:focus {
+	border-color: var(--sf-ink) !important;
+}
+
+.stillframe-recent-btn:hover {
+	color: var(--sf-ink) !important;
+	border-color: var(--sf-pick-line) !important;
+	background: var(--sf-well) !important;
+}
+
+.stillframe-recent-card:hover .stillframe-recent-title {
+	color: var(--sf-text);
+}
+
+.stillframe-device-tab.is-active {
+	background: var(--sf-well);
+	border-color: var(--sf-line-strong);
+}
+
+.stillframe-device-tab__annotated {
+	color: var(--sf-text-2);
+	border-color: var(--sf-line-strong);
+}
+
+.stillframe-sidebar-action-btn:hover {
+	color: var(--sf-ink);
+	border-color: var(--sf-pick-line);
+	background: var(--sf-well);
+}
+
+.stillframe-tool[aria-pressed="true"],
+.stillframe-size[aria-pressed="true"] {
+	color: var(--sf-ink);
+	border-color: var(--sf-line-strong);
+}
+
+.stillframe-swatch[aria-pressed="true"] {
+	box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.18), 0 0 0 2px var(--sf-well), 0 0 0 4px var(--sf-ink);
+}
+
+/* Nothing in the capture UI or the picture should highlight as page text. */
+.stillframe-snip,
+.stillframe-result,
+.stillframe-result *,
+.stillframe-snip * {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.stillframe-result input,
+.stillframe-snip input,
+.stillframe-snip select {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+.stillframe-result img,
+.stillframe-result canvas {
+	-webkit-user-drag: none;
+	-webkit-touch-callout: none;
+}
+
+.stillframe-result ::selection,
+.stillframe-snip ::selection {
+	background: transparent;
+}
+
+.stillframe-result input::selection,
+.stillframe-snip input::selection {
+	background: #cfe3ff;
+}
