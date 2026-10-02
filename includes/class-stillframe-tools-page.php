@@ -60,15 +60,16 @@ class Stillframe_Tools_Page {
 		);
 		?>
 		<div class="wrap stillframe-tools-wrap">
-			<!-- Single unified container box -->
+			<h1 class="screen-reader-text"><?php esc_html_e( 'Stillframe', 'stillframe' ); ?></h1>
+			<hr class="wp-header-end" />
 			<div class="stillframe-box">
-				<!-- Header -->
 				<div class="stillframe-box__header">
-					<img src="<?php echo esc_url( plugins_url( 'assets/images/icon-128x128.png', STILLFRAME_FILE ) ); ?>" width="32" height="32" alt="<?php esc_attr_e( 'Stillframe', 'stillframe' ); ?>" class="stillframe-box__logo" />
+					<img src="<?php echo esc_url( plugins_url( 'assets/images/icon-128x128.png', STILLFRAME_FILE ) ); ?>" width="44" height="44" alt="" class="stillframe-box__logo" />
 					<div class="stillframe-box__brand">
-						<h2><?php esc_html_e( 'Stillframe Studio', 'stillframe' ); ?></h2>
-						<span class="stillframe-box__sub"><?php esc_html_e( 'Multi-device website screenshot capture', 'stillframe' ); ?></span>
+						<p class="stillframe-box__title"><?php esc_html_e( 'Stillframe Studio', 'stillframe' ); ?></p>
+						<p class="stillframe-box__sub"><?php esc_html_e( 'Capture any page at desktop, tablet and phone sizes, then annotate and export.', 'stillframe' ); ?></p>
 					</div>
+					<span class="stillframe-box__version"><?php echo esc_html( 'v' . STILLFRAME_VERSION ); ?></span>
 				</div>
 
 				<form id="stillframe-multicapture-form" onsubmit="return false;" class="stillframe-box__body">
@@ -235,42 +236,8 @@ class Stillframe_Tools_Page {
 							</svg>
 							<span><?php esc_html_e( 'Capture Selected Devices', 'stillframe' ); ?></span>
 						</button>
-						<div id="stillframe-progress-wrap" class="stillframe-progress-wrap" hidden style="display: none;">
-							<div class="stillframe-spinner"></div>
-							<span id="stillframe-progress-message" class="stillframe-progress-msg" aria-live="polite"></span>
-						</div>
 					</div>
 				</form>
-
-				<!-- Results Section (Inside the SAME Box!) -->
-				<div id="stillframe-results-section" class="stillframe-box__results" hidden style="display: none;">
-					<div class="stillframe-results-top">
-						<div>
-							<h3><?php esc_html_e( 'Showcase Previews', 'stillframe' ); ?></h3>
-							<p class="stillframe-results-subtitle"><?php esc_html_e( 'Click a preview to view full size. Use Edit to annotate with arrows &amp; drawings.', 'stillframe' ); ?></p>
-						</div>
-						<div class="stillframe-results-batch-actions">
-							<button type="button" class="stillframe-btn stillframe-btn--primary" id="stillframe-save-all-btn">
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"></rect>
-									<circle cx="9" cy="10" r="1.6"></circle>
-									<path d="M20.5 16l-5-5L8 19.5"></path>
-								</svg>
-								<span><?php esc_html_e( 'Save All to Media', 'stillframe' ); ?></span>
-							</button>
-							<button type="button" class="stillframe-btn stillframe-btn--secondary" id="stillframe-download-all-btn">
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M12 4v11M7.5 11L12 15.5 16.5 11M5 20h14"></path>
-								</svg>
-								<span><?php esc_html_e( 'Download All', 'stillframe' ); ?></span>
-							</button>
-						</div>
-					</div>
-
-					<div id="stillframe-results-grid" class="stillframe-grid">
-						<!-- Injected dynamically via stillframe-tools.js -->
-					</div>
-				</div>
 			</div>
 		</div>
 		<?php

@@ -1509,6 +1509,26 @@
 		arrow: [
 			{ d: 'M5 19L18.5 5.5M9.5 5h9.5v9.5' }
 		],
+		rect: [
+			{ tag: 'rect', x: '4', y: '6', width: '16', height: '12', rx: '1.5' }
+		],
+		highlight: [
+			{ tag: 'rect', x: '4', y: '8', width: '16', height: '8', rx: '1.5', fill: 'currentColor', 'fill-opacity': '0.28' },
+			{ d: 'M4 8h16M4 16h16' }
+		],
+		text: [
+			{ d: 'M5 6.5V5h14v1.5M12 5v14M9 19h6' }
+		],
+		step: [
+			{ tag: 'circle', cx: '12', cy: '12', r: '9' },
+			{ d: 'M10.4 9.8l2.2-1.6V16' }
+		],
+		blur: [
+			{ tag: 'rect', x: '4', y: '4', width: '7', height: '7', rx: '1', fill: 'currentColor', 'fill-opacity': '0.35' },
+			{ tag: 'rect', x: '13', y: '13', width: '7', height: '7', rx: '1', fill: 'currentColor', 'fill-opacity': '0.35' },
+			{ tag: 'rect', x: '13', y: '4', width: '7', height: '7', rx: '1' },
+			{ tag: 'rect', x: '4', y: '13', width: '7', height: '7', rx: '1' }
+		],
 		undo: [
 			{ d: 'M9 14L4 9l5-5' },
 			{ d: 'M4 9h10a6 6 0 0 1 0 12h-3' }
@@ -1732,6 +1752,8 @@
 				btn.disabled = false;
 				btn.title = 'Saved to Media Library!';
 				btn.style.color = '#059669';
+				var lbl = btn.querySelector('span');
+				if (lbl) lbl.textContent = 'Saved';
 			}
 		}).catch(function () {
 			if (btn) btn.disabled = false;
@@ -1754,31 +1776,33 @@
 		var listWrap = element('div', { className: 'stillframe-recent-list' });
 		list.forEach(function (item) {
 			var card = element('div', { className: 'stillframe-recent-card' });
+			var thumbWrap = element('div', { className: 'stillframe-recent-thumbwrap' });
 			if (item.thumb) {
-				var thumb = element('img', {
+				thumbWrap.appendChild(element('img', {
 					className: 'stillframe-recent-thumb',
 					alt: item.title,
 					src: item.thumb
-				});
-				card.appendChild(thumb);
+				}));
 			}
+			card.appendChild(thumbWrap);
+
 			var info = element('div', { className: 'stillframe-recent-info' });
-			var titleEl = element('strong', { className: 'stillframe-recent-title', text: item.title });
-			var metaEl = element('span', {
-				className: 'stillframe-recent-meta',
-				text: (item.width && item.height ? item.width + '×' + item.height + ' • ' : '') + formatRecentTime(item.timestamp)
-			});
-			info.appendChild(titleEl);
-			info.appendChild(metaEl);
-			card.appendChild(info);
+			info.appendChild(element('strong', { className: 'stillframe-recent-title', text: item.title, title: item.title }));
+			var meta = element('div', { className: 'stillframe-recent-meta' });
+			if (item.width && item.height) {
+				meta.appendChild(element('span', { className: 'stillframe-recent-chip', text: item.width + ' × ' + item.height }));
+			}
+			meta.appendChild(element('span', { text: formatRecentTime(item.timestamp) }));
+			info.appendChild(meta);
 
 			var actions = element('div', { className: 'stillframe-recent-actions' });
 			var editBtn = element('button', {
 				type: 'button',
 				className: 'stillframe-recent-btn',
-				title: 'Open in Editor (Draw & Annotate)'
+				title: 'Open in editor to draw and annotate'
 			});
 			editBtn.appendChild(iconSvg('edit', 13));
+			editBtn.appendChild(element('span', { text: 'Edit' }));
 			editBtn.addEventListener('click', function (e) {
 				e.stopPropagation();
 				if (onSelect) onSelect(item);
@@ -1792,6 +1816,7 @@
 					title: 'Save to Media Library'
 				});
 				mediaBtn.appendChild(iconSvg('media', 13));
+				mediaBtn.appendChild(element('span', { text: 'Save to Media' }));
 				mediaBtn.addEventListener('click', function (e) {
 					e.stopPropagation();
 					uploadRecentToMedia(item, mediaBtn);
@@ -1802,7 +1827,8 @@
 			var delBtn = element('button', {
 				type: 'button',
 				className: 'stillframe-recent-btn stillframe-recent-btn--del',
-				title: 'Remove'
+				title: 'Remove',
+				'aria-label': 'Remove'
 			});
 			delBtn.appendChild(iconSvg('trash', 13));
 			delBtn.addEventListener('click', function (e) {
@@ -1812,7 +1838,8 @@
 			});
 			actions.appendChild(delBtn);
 
-			card.appendChild(actions);
+			info.appendChild(actions);
+			card.appendChild(info);
 
 			card.addEventListener('click', function () {
 				if (onSelect) onSelect(item);
@@ -1894,6 +1921,11 @@
 		penButton = addTool('pen', text('pen') || 'Pen', 'p', true);
 		addTool('circle', text('circle') || 'Circle', 'c', false);
 		addTool('arrow', text('arrow') || 'Arrow', 'a', false);
+		addTool('rect', text('rect') || 'Rectangle', 'r', false);
+		addTool('highlight', text('highlight') || 'Highlight', 'h', false);
+		addTool('text', text('textTool') || 'Text', 't', false);
+		addTool('step', text('step') || 'Numbered step', 'n', false);
+		addTool('blur', text('blur') || 'Blur (hide sensitive info)', 'b', false);
 
 		var colorGroup = element('div', {
 			className: 'stillframe-result__swatches',
@@ -2350,6 +2382,9 @@
 		panel = root;
 		dialog = win;
 		keyHandler = function (event) {
+			if (event.target && event.target.classList && event.target.classList.contains('stillframe-text-input')) {
+				return;
+			}
 			if (event.key === 'Escape') {
 				event.preventDefault();
 				event.stopPropagation();
@@ -4251,4 +4286,8 @@
 	};
 
 	api.openResult = openResult;
+
+	api.openMultiCapture = function (url, devices, scale, hideAdminBar, isFullPage) {
+		openMultiDirectCapture(url, devices, scale, hideAdminBar, isFullPage);
+	};
 })();

@@ -68,7 +68,76 @@
 		ctx.stroke();
 	}
 
-	function drawMark(ctx, mark, width, height, unit) {
+	var BOX_TYPES = { circle: 1, rect: 1, highlight: 1, blur: 1 };
+
+	function textSize(mark, unit) {
+		return (12 + (mark.size || defaultSize) * 2.5) * unit;
+	}
+
+	function drawBox(ctx, mark, width, height) {
+		var x = Math.min(mark.x1, mark.x2) * width;
+		var y = Math.min(mark.y1, mark.y2) * height;
+		var w = Math.abs(mark.x2 - mark.x1) * width;
+		var h = Math.abs(mark.y2 - mark.y1) * height;
+		return { x: x, y: y, w: w, h: h };
+	}
+
+	function drawBlur(ctx, mark, width, height, unit, image) {
+		var box = drawBox(ctx, mark, width, height);
+		if (!image || !image.naturalWidth || box.w < 2 || box.h < 2) {
+			return;
+		}
+		var block = Math.max(8, 7 * unit);
+		var tw = Math.max(1, Math.round(box.w / block));
+		var th = Math.max(1, Math.round(box.h / block));
+		var tmp = document.createElement('canvas');
+		tmp.width = tw;
+		tmp.height = th;
+		var tctx = tmp.getContext('2d');
+		if (!tctx) {
+			return;
+		}
+		var kx = image.naturalWidth / width;
+		var ky = image.naturalHeight / height;
+		tctx.drawImage(image, box.x * kx, box.y * ky, box.w * kx, box.h * ky, 0, 0, tw, th);
+		ctx.imageSmoothingEnabled = false;
+		ctx.drawImage(tmp, 0, 0, tw, th, box.x, box.y, box.w, box.h);
+	}
+
+	function drawStep(ctx, mark, width, height, unit) {
+		var radius = (9 + (mark.size || defaultSize) * 1.5) * unit;
+		var cx = mark.x1 * width;
+		var cy = mark.y1 * height;
+		ctx.beginPath();
+		ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.lineWidth = 2 * unit;
+		ctx.strokeStyle = '#ffffff';
+		ctx.stroke();
+		ctx.shadowColor = 'transparent';
+		ctx.fillStyle = '#ffffff';
+		ctx.font = '700 ' + Math.round(radius * 1.1) + 'px -apple-system, "Segoe UI", Roboto, sans-serif';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText(String(mark.n || 1), cx, cy + radius * 0.05);
+	}
+
+	function drawText(ctx, mark, width, height, unit) {
+		if (!mark.text) {
+			return;
+		}
+		var px = textSize(mark, unit);
+		ctx.font = '700 ' + Math.round(px) + 'px -apple-system, "Segoe UI", Roboto, sans-serif';
+		ctx.textAlign = 'left';
+		ctx.textBaseline = 'top';
+		ctx.lineWidth = Math.max(3, px / 5);
+		ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+		ctx.shadowColor = 'transparent';
+		ctx.strokeText(mark.text, mark.x1 * width, mark.y1 * height);
+		ctx.fillText(mark.text, mark.x1 * width, mark.y1 * height);
+	}
+
+	function drawMark(ctx, mark, width, height, unit, image) {
 		var color = mark.color || defaultColor;
 		var lineWidth = (mark.size || defaultSize) * unit;
 		ctx.save();
@@ -97,6 +166,24 @@
 			}
 		} else if (mark.type === 'arrow') {
 			drawArrow(ctx, mark.x1 * width, mark.y1 * height, mark.x2 * width, mark.y2 * height, lineWidth, unit);
+		} else if (mark.type === 'rect') {
+			var rb = drawBox(ctx, mark, width, height);
+			if (rb.w >= 1 || rb.h >= 1) {
+				ctx.lineJoin = 'miter';
+				ctx.strokeRect(rb.x, rb.y, rb.w, rb.h);
+			}
+		} else if (mark.type === 'highlight') {
+			var hb = drawBox(ctx, mark, width, height);
+			ctx.shadowColor = 'transparent';
+			ctx.globalAlpha = 0.35;
+			ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
+		} else if (mark.type === 'blur') {
+			ctx.shadowColor = 'transparent';
+			drawBlur(ctx, mark, width, height, unit, image);
+		} else if (mark.type === 'step') {
+			drawStep(ctx, mark, width, height, unit);
+		} else if (mark.type === 'text') {
+			drawText(ctx, mark, width, height, unit);
 		}
 		ctx.restore();
 	}
@@ -118,7 +205,7 @@
 			ctx.drawImage(image, 0, 0, exportCanvas.width, exportCanvas.height);
 			var unit = displayWidth ? (image.naturalWidth / displayWidth) : 1;
 			(marksList || []).forEach(function (mark) {
-				drawMark(ctx, mark, exportCanvas.width, exportCanvas.height, unit);
+				drawMark(ctx, mark, exportCanvas.width, exportCanvas.height, unit, image);
 			});
 			exportCanvas.toBlob(function (blob) {
 				if (!blob) {
@@ -166,10 +253,10 @@
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			var unit = displayScale();
 			marks.forEach(function (mark) {
-				drawMark(ctx, mark, canvas.width, canvas.height, unit);
+				drawMark(ctx, mark, canvas.width, canvas.height, unit, image);
 			});
 			if (drawing) {
-				drawMark(ctx, drawing, canvas.width, canvas.height, unit);
+				drawMark(ctx, drawing, canvas.width, canvas.height, unit, image);
 			}
 		}
 
@@ -197,13 +284,13 @@
 		}
 
 		function constrain(point, event) {
-			if (!event.shiftKey || !drawing || drawing.type === 'pen') {
+			if (!event.shiftKey || !drawing || drawing.type === 'pen' || !('x2' in drawing)) {
 				return point;
 			}
 			var rect = canvas.getBoundingClientRect();
 			var dx = (point.x - drawing.x1) * rect.width;
 			var dy = (point.y - drawing.y1) * rect.height;
-			if (drawing.type === 'circle') {
+			if (BOX_TYPES[drawing.type]) {
 				var side = Math.max(Math.abs(dx), Math.abs(dy));
 				dx = dx < 0 ? -side : side;
 				dy = dy < 0 ? -side : side;
@@ -220,6 +307,51 @@
 			};
 		}
 
+		function beginText(event, point) {
+			var input = document.createElement('input');
+			var done = false;
+			var px = textSize({ size: size }, 1);
+			input.type = 'text';
+			input.className = 'stillframe-text-input';
+			input.setAttribute('aria-label', 'Annotation text');
+			input.style.cssText = 'position:fixed;z-index:1000002;margin:0;padding:0 2px;min-width:80px;height:' + Math.round(px * 1.3) + 'px;' +
+				'left:' + Math.round(event.clientX) + 'px;top:' + Math.round(event.clientY) + 'px;' +
+				'font:700 ' + Math.round(px) + 'px -apple-system,"Segoe UI",Roboto,sans-serif;color:' + color + ';' +
+				'background:rgba(255,255,255,.85);border:1px dashed ' + color + ';border-radius:2px;outline:none;box-shadow:none;';
+			function finish(commit) {
+				if (done) {
+					return;
+				}
+				done = true;
+				var value = input.value.trim();
+				if (input.parentNode) {
+					input.parentNode.removeChild(input);
+				}
+				if (commit && value) {
+					marks.push({ type: 'text', text: value, color: color, size: size, x1: point.x, y1: point.y });
+					redraw();
+					notify();
+				}
+			}
+			input.addEventListener('keydown', function (e) {
+				e.stopPropagation();
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					finish(true);
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					finish(false);
+				}
+			});
+			input.addEventListener('blur', function () {
+				finish(true);
+			});
+			document.body.appendChild(input);
+			window.setTimeout(function () {
+				input.focus();
+			}, 0);
+		}
+
 		function onPointerDown(event) {
 			if (event.button !== 0) {
 				return;
@@ -227,6 +359,19 @@
 			event.preventDefault();
 			canvas.setPointerCapture(event.pointerId);
 			var point = pointFromEvent(event);
+			if (tool === 'step') {
+				canvas.releasePointerCapture(event.pointerId);
+				var count = marks.filter(function (m) { return m.type === 'step'; }).length;
+				marks.push({ type: 'step', n: count + 1, color: color, size: size, x1: point.x, y1: point.y });
+				redraw();
+				notify();
+				return;
+			}
+			if (tool === 'text') {
+				canvas.releasePointerCapture(event.pointerId);
+				beginText(event, point);
+				return;
+			}
 			if (tool === 'pen') {
 				drawing = { type: 'pen', color: color, size: size, points: [point] };
 			} else {
@@ -290,7 +435,7 @@
 
 		return {
 			setTool: function (next) {
-				if (next === 'pen' || next === 'circle' || next === 'arrow') {
+				if (next === 'pen' || next === 'circle' || next === 'arrow' || next === 'rect' || next === 'highlight' || next === 'text' || next === 'step' || next === 'blur') {
 					tool = next;
 				}
 			},
@@ -358,7 +503,7 @@
 					var rect = image.getBoundingClientRect();
 					var unit = rect.width ? (image.naturalWidth / rect.width) : 1;
 					marks.forEach(function (mark) {
-						drawMark(ctx, mark, exportCanvas.width, exportCanvas.height, unit);
+						drawMark(ctx, mark, exportCanvas.width, exportCanvas.height, unit, image);
 					});
 					exportCanvas.toBlob(function (blob) {
 						if (!blob) {
