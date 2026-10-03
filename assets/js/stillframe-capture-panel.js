@@ -2897,6 +2897,13 @@
 				event.preventDefault();
 				return;
 			}
+			if ((event.ctrlKey || event.metaKey) && ((event.shiftKey && (event.key === 'z' || event.key === 'Z')) || event.key === 'y' || event.key === 'Y')) {
+				event.preventDefault();
+				if (editor && editor.redo) {
+					editor.redo();
+				}
+				return;
+			}
 			if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z') && !event.shiftKey) {
 				event.preventDefault();
 				if (editor) {

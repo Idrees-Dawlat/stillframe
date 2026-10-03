@@ -58,13 +58,35 @@ class Stillframe_Asset_Loader {
 			STILLFRAME_VERSION
 		);
 
-		wp_register_script(
-			'stillframe-annotation-editor',
-			$base . 'assets/js/stillframe-annotation-editor.js',
-			array(),
-			STILLFRAME_VERSION,
-			true
-		);
+		/**
+		 * Filters whether the Fabric.js annotation editor is used. Return false for the legacy editor.
+		 *
+		 * @param bool $use_fabric Whether to use the Fabric.js editor.
+		 */
+		if ( apply_filters( 'stillframe_use_fabric_editor', true ) ) {
+			wp_register_script(
+				'stillframe-fabric',
+				$base . 'assets/js/vendor/fabric.min.js',
+				array(),
+				'6.7.1',
+				true
+			);
+			wp_register_script(
+				'stillframe-annotation-editor',
+				$base . 'assets/js/stillframe-annotation-editor-v2.js',
+				array( 'stillframe-fabric' ),
+				STILLFRAME_VERSION,
+				true
+			);
+		} else {
+			wp_register_script(
+				'stillframe-annotation-editor',
+				$base . 'assets/js/stillframe-annotation-editor.js',
+				array(),
+				STILLFRAME_VERSION,
+				true
+			);
+		}
 
 		wp_register_script(
 			'stillframe-capture-panel',

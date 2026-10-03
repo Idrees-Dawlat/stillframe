@@ -85,6 +85,8 @@ Stillframe is open-source software. You can view the source code, contribute, or
 
 Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/modern-screenshot.js. Source: https://github.com/qq15725/modern-screenshot. The license text is in assets/js/vendor/LICENSE-modern-screenshot.txt.
 
+Stillframe also bundles Fabric.js 6.7.1 (MIT license) as assets/js/vendor/fabric.min.js. Source: https://github.com/fabricjs/fabric.js (npm package "fabric"). The license text is in assets/js/vendor/LICENSE-fabric.txt.
+
 == Changelog ==
 
 = 0.2.0 =

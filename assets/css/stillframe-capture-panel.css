@@ -2436,3 +2436,12 @@ body.stillframe-locked {
 		min-width: 0;
 	}
 }
+
+/* Fabric annotation layer sits exactly over the captured image */
+.stillframe-result .stillframe-annotation-wrapper {
+	z-index: 2;
+}
+
+.stillframe-result .stillframe-annotation-wrapper canvas {
+	touch-action: none;
+}

@@ -26,6 +26,7 @@ Stillframe is a lightweight WordPress plugin that lets administrators capture, a
 
 - Licensed under **GPL-2.0-or-later**. See `LICENSE`.
 - Bundles `modern-screenshot` 4.7.0 (MIT License). See `assets/js/vendor/LICENSE-modern-screenshot.txt`.
+- Bundles `fabric` 6.7.1 (MIT License) for the annotation editor. See `assets/js/vendor/LICENSE-fabric.txt`.
 
 ## Author
 
