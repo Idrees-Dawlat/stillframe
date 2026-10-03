@@ -966,6 +966,28 @@
 					}
 				});
 			} catch (e) {}
+			// Themes offset sticky and fixed headers for the bar; remove those offsets too.
+			try {
+				[doc.documentElement, doc.body].forEach(function (node) {
+					if (node && node.classList && node.classList.contains('admin-bar')) {
+						node.classList.remove('admin-bar');
+						restorers.push(function () {
+							node.classList.add('admin-bar');
+						});
+					}
+				});
+				important(doc.documentElement, '--wp-admin--admin-bar--height', '0px');
+				var view = doc.defaultView || window;
+				Array.prototype.forEach.call(doc.body ? doc.body.querySelectorAll('*') : [], function (node) {
+					if (node.id === 'wpadminbar' || (node.closest && node.closest('#wpadminbar'))) {
+						return;
+					}
+					var cs = view.getComputedStyle(node);
+					if ((cs.position === 'fixed' || cs.position === 'sticky') && (cs.top === '32px' || cs.top === '46px')) {
+						important(node, 'top', '0px');
+					}
+				});
+			} catch (e2) {}
 		}
 
 		if (!prefs.adminMenu) {
@@ -3021,14 +3043,14 @@
 		hubAdminCb.checked = true;
 		hubAdminLabel.appendChild(hubAdminCb);
 		hubAdminLabel.appendChild(element('span', { className: 'stillframe-hub-toggle__track' }));
-		hubAdminLabel.appendChild(element('span', { text: 'Hide WordPress Admin Bar' }));
+		hubAdminLabel.appendChild(element('span', { text: 'Hide admin bar in screenshot' }));
 
 		// Resolution Quality - pill selector (1x / 2x / 3x)
 		var hubResField = element('div', { className: 'stillframe-hub-field' });
 		hubResField.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Resolution Quality' }));
 		var hubResRow = element('div', { className: 'stillframe-hub-res-row' });
 		var hubResOptions = [
-			{ value: '1', label: '1x Standard' },
+			{ value: '1', label: '1x Standard', title: 'Same pixels as the screen' },
 			{ value: '2', label: '2x Retina', default: true },
 			{ value: '3', label: '3x Ultra' }
 		];
@@ -3043,6 +3065,7 @@
 			pill.addEventListener('click', function (e) {
 				stopBar(e);
 				hubResSelected = opt.value;
+				hubResHelp.textContent = RES_HELP[opt.value] || '';
 				Array.prototype.forEach.call(hubResRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
 					p.classList.toggle('is-active', p === pill);
 				});
@@ -3050,6 +3073,13 @@
 			hubResRow.appendChild(pill);
 		});
 		hubResField.appendChild(hubResRow);
+		var RES_HELP = {
+			'1': 'Same pixels as the screen. Smallest files, good for docs and chat.',
+			'2': 'Sharp on modern high-density displays. Recommended.',
+			'3': 'Maximum detail for print or zooming. Large files; very long pages may be reduced automatically.'
+		};
+		var hubResHelp = element('span', { className: 'stillframe-hub-help', text: RES_HELP['2'] });
+		hubResField.appendChild(hubResHelp);
 
 		// Capture Height - pill selector (Viewport / Full Page)
 		var hubHeightField = element('div', { className: 'stillframe-hub-field' });
@@ -3070,6 +3100,7 @@
 			pill.addEventListener('click', function (e) {
 				stopBar(e);
 				hubHeightSelected = opt.value;
+				hubHeightHelp.textContent = HEIGHT_HELP[opt.value] || '';
 				Array.prototype.forEach.call(hubHeightRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
 					p.classList.toggle('is-active', p === pill);
 				});
@@ -3077,6 +3108,12 @@
 			hubHeightRow.appendChild(pill);
 		});
 		hubHeightField.appendChild(hubHeightRow);
+		var HEIGHT_HELP = {
+			viewport: 'Only the first screen (above the fold).',
+			fullpage: 'The entire page, top to bottom.'
+		};
+		var hubHeightHelp = element('span', { className: 'stillframe-hub-help', text: HEIGHT_HELP.viewport });
+		hubHeightField.appendChild(hubHeightHelp);
 
 		// Capture Button (NO lightning emoji! Uses clean camera SVG icon)
 		var hubSubmit = element('button', {
@@ -4383,10 +4420,40 @@
 		var list = element('div', { className: 'stillframe-picker__list', role: 'listbox', id: uid + '-list', 'aria-label': 'Pages' });
 		var summary = element('div', { className: 'stillframe-picker__summary', 'aria-live': 'polite' });
 
-		root.appendChild(customRow);
-		root.appendChild(search);
-		root.appendChild(list);
-		root.appendChild(summary);
+		var trigger = element('button', { type: 'button', className: 'stillframe-picker__trigger', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' });
+		trigger.appendChild(summary);
+		trigger.appendChild(iconSvg('chevronDown', 12));
+		var drop = element('div', { className: 'stillframe-picker__drop' });
+		drop.hidden = true;
+		drop.appendChild(customRow);
+		drop.appendChild(search);
+		drop.appendChild(list);
+		root.appendChild(trigger);
+		root.appendChild(drop);
+
+		function openDrop() {
+			drop.hidden = false;
+			trigger.setAttribute('aria-expanded', 'true');
+			root.classList.add('is-open');
+			search.focus();
+		}
+
+		function closeDrop(refocus) {
+			drop.hidden = true;
+			trigger.setAttribute('aria-expanded', 'false');
+			root.classList.remove('is-open');
+			if (refocus) {
+				trigger.focus();
+			}
+		}
+
+		trigger.addEventListener('click', function () {
+			if (drop.hidden) {
+				openDrop();
+			} else {
+				closeDrop(false);
+			}
+		});
 
 		function entryFor(key) {
 			for (var i = 0; i < entries.length; i++) {
@@ -4405,7 +4472,7 @@
 				var entry = entryFor(sel);
 				label = entry ? entry.title + (entry.path ? '  ' + entry.path : '') : sel;
 			}
-			summary.textContent = 'Target: ' + label;
+			summary.textContent = label;
 		}
 
 		function setActive(index, scroll) {
@@ -4431,6 +4498,7 @@
 				row.node.setAttribute('aria-selected', on ? 'true' : 'false');
 			});
 			updateSummary();
+			closeDrop(true);
 			if (typeof opts.onChange === 'function') {
 				opts.onChange(sel);
 			}
@@ -4527,10 +4595,10 @@
 				event.preventDefault();
 				event.stopPropagation();
 				commitCustom();
-			} else if (event.key === 'Escape' && typeof opts.onEscape === 'function') {
+			} else if (event.key === 'Escape') {
 				event.preventDefault();
 				event.stopPropagation();
-				opts.onEscape();
+				closeDrop(true);
 			}
 		});
 
@@ -4566,9 +4634,19 @@
 					search.value = '';
 					window.clearTimeout(searchTimer);
 					render();
-				} else if (typeof opts.onEscape === 'function') {
-					opts.onEscape();
+				} else {
+					closeDrop(true);
 				}
+			}
+		});
+		trigger.addEventListener('keydown', function (event) {
+			if (event.key === 'Escape' && typeof opts.onEscape === 'function') {
+				event.preventDefault();
+				event.stopPropagation();
+				opts.onEscape();
+			} else if (event.key === 'ArrowDown' && drop.hidden) {
+				event.preventDefault();
+				openDrop();
 			}
 		});
 
