@@ -3978,7 +3978,7 @@
 			if (!snip) {
 				return;
 			}
-			if (event.target && event.target.closest && event.target.closest('.stillframe-picker')) {
+			if (event.target && event.target.closest && event.target.closest('.sfp')) {
 				return;
 			}
 			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A') && !/^(INPUT|TEXTAREA|SELECT)$/.test((event.target && event.target.tagName) || '')) {
