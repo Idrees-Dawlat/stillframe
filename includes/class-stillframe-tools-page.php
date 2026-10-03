@@ -48,16 +48,6 @@ class Stillframe_Tools_Page {
 			wp_die( esc_html__( 'You cannot capture this screen.', 'stillframe' ) );
 		}
 
-		$home_url   = home_url( '/' );
-		$site_pages = get_posts(
-			array(
-				'post_type'      => array( 'page', 'post' ),
-				'post_status'    => 'publish',
-				'posts_per_page' => 30,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
-			)
-		);
 		?>
 		<div class="wrap stillframe-tools-wrap">
 			<h1 class="screen-reader-text"><?php esc_html_e( 'Stillframe', 'stillframe' ); ?></h1>
@@ -71,31 +61,11 @@ class Stillframe_Tools_Page {
 					<!-- Target Page -->
 					<div class="stillframe-field-group">
 						<div class="stillframe-field-group__header">
-							<label class="stillframe-field-group__title" for="stillframe-target-page"><?php esc_html_e( 'Target Page', 'stillframe' ); ?></label>
+							<span class="stillframe-field-group__title"><?php esc_html_e( 'Target Page', 'stillframe' ); ?></span>
 							<span class="stillframe-field-group__hint"><?php esc_html_e( 'Select a site page or enter a custom URL to capture.', 'stillframe' ); ?></span>
 						</div>
 						<div class="stillframe-page-picker">
-							<select id="stillframe-target-page" class="stillframe-select">
-								<option value="<?php echo esc_url( $home_url ); ?>">
-									<?php echo esc_html__( 'Home Page', 'stillframe' ) . ' (' . esc_html( $home_url ) . ')'; ?>
-								</option>
-								<?php foreach ( $site_pages as $page ) : ?>
-									<?php
-									$page_url = get_permalink( $page );
-									if ( ! $page_url || $page_url === $home_url ) {
-										continue;
-									}
-									$title = $page->post_title ? $page->post_title : __( '(No title)', 'stillframe' );
-									?>
-									<option value="<?php echo esc_url( $page_url ); ?>">
-										<?php echo esc_html( $title . ' (' . ucfirst( $page->post_type ) . ')' ); ?>
-									</option>
-								<?php endforeach; ?>
-								<option value="__custom__"><?php esc_html_e( 'Custom URL...', 'stillframe' ); ?></option>
-							</select>
-							<div id="stillframe-custom-url-wrap" class="stillframe-custom-url-wrap" hidden style="display: none;">
-								<input type="url" id="stillframe-custom-url" class="stillframe-input" placeholder="https://example.com/" />
-							</div>
+							<div id="stillframe-target-page"></div>
 						</div>
 					</div>
 

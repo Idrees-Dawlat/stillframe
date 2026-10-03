@@ -19,7 +19,7 @@ class Stillframe_Asset_Loader {
 	 *
 	 * @var string
 	 */
-	public const PAGES_TRANSIENT = 'stillframe_site_pages';
+	public const PAGES_TRANSIENT = 'stillframe_site_pages_v2';
 
 	/**
 	 * Query arguments that must not be replayed inside the capture frame.
@@ -96,7 +96,7 @@ class Stillframe_Asset_Loader {
 			'minWidth'     => 320,
 			'maxWidth'     => 2560,
 			'homeUrl'      => home_url( '/' ),
-			'sitePages'    => $this->site_pages(),
+			'sitePages'    => self::site_pages(),
 			'toolsUrl'     => admin_url( 'tools.php?page=stillframe' ),
 			'stripArgs'    => self::STRIPPED_QUERY_ARGS,
 			'i18n'         => $this->script_strings(),
@@ -144,7 +144,7 @@ class Stillframe_Asset_Loader {
 				'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 				'mediaNonce' => wp_create_nonce( 'stillframe_save_media' ),
 				'canUpload'  => current_user_can( 'upload_files' ),
-				'pages'      => $this->site_pages(),
+				'pages'      => self::site_pages(),
 			);
 			wp_add_inline_script(
 				'stillframe-tools',
@@ -163,37 +163,86 @@ class Stillframe_Asset_Loader {
 	}
 
 	/**
-	 * Retrieve a list of published pages and posts for quick selection.
+	 * Retrieve published content from every public post type, for the page picker.
 	 *
-	 * @return array<int, array{id: int, title: string, type: string, url: string}>
+	 * Shared by the capture panel and the Tools screen.
+	 *
+	 * @return array<int, array{id: int, title: string, type: string, url: string, path: string, parent: string, status: string, home: bool}>
 	 */
-	private function site_pages() {
+	public static function site_pages() {
 		$cached = get_transient( self::PAGES_TRANSIENT );
 		if ( is_array( $cached ) ) {
 			return $cached;
 		}
 
-		$items = array();
+		$types = array_values( array_diff( get_post_types( array( 'public' => true ) ), array( 'attachment' ) ) );
+
+		/**
+		 * Filters the maximum number of items listed in the page picker.
+		 *
+		 * @param int $max Maximum number of items.
+		 */
+		$max = (int) apply_filters( 'stillframe_max_pages', 500 );
+		if ( $max < 1 ) {
+			$max = 500;
+		}
+
 		$pages = get_posts(
 			array(
-				'post_type'      => array( 'page', 'post' ),
+				'post_type'      => $types,
 				'post_status'    => 'publish',
-				'posts_per_page' => 25,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
+				'posts_per_page' => $max,
+				'no_found_rows'  => true,
+				'orderby'        => array(
+					'type'       => 'ASC',
+					'menu_order' => 'ASC',
+					'title'      => 'ASC',
+				),
 			)
 		);
-		foreach ( $pages as $p ) {
-			$permalink = get_permalink( $p );
-			if ( $permalink ) {
-				$items[] = array(
-					'id'    => (int) $p->ID,
-					'title' => $p->post_title ? $p->post_title : __( '(No title)', 'stillframe' ),
-					'type'  => $p->post_type,
-					'url'   => $permalink,
-				);
+
+		$home_ids = array_values(
+			array_filter(
+				array(
+					(int) get_option( 'page_on_front' ),
+					(int) get_option( 'page_for_posts' ),
+				)
+			)
+		);
+
+		foreach ( array_reverse( $home_ids ) as $home_id ) {
+			$home_post = get_post( $home_id );
+			if ( $home_post && 'publish' === $home_post->post_status ) {
+				array_unshift( $pages, $home_post );
 			}
 		}
+
+		$items = array();
+		$seen  = array();
+		foreach ( $pages as $p ) {
+			if ( isset( $seen[ $p->ID ] ) ) {
+				continue;
+			}
+			$seen[ $p->ID ] = true;
+
+			$permalink = get_permalink( $p );
+			if ( ! $permalink ) {
+				continue;
+			}
+
+			$path    = wp_parse_url( $permalink, PHP_URL_PATH );
+			$items[] = array(
+				'id'     => (int) $p->ID,
+				'title'  => $p->post_title ? $p->post_title : __( '(No title)', 'stillframe' ),
+				'type'   => $p->post_type,
+				'url'    => $permalink,
+				'path'   => is_string( $path ) && '' !== $path ? $path : '/',
+				'parent' => $p->post_parent ? get_the_title( $p->post_parent ) : '',
+				'status' => $p->post_status,
+				'home'   => in_array( (int) $p->ID, $home_ids, true ),
+			);
+		}
+
 		set_transient( self::PAGES_TRANSIENT, $items, 12 * HOUR_IN_SECONDS );
 		return $items;
 	}

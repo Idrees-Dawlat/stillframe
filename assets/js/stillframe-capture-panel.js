@@ -2901,55 +2901,21 @@
 
 		// Page Select
 		var hubPageWrap = element('div', { className: 'stillframe-hub-field' });
-		hubPageWrap.appendChild(element('label', { className: 'stillframe-hub-label', text: 'Target Page' }));
-		var hubPageSelect = element('select', { className: 'stillframe-hub-select' });
+		hubPageWrap.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Target Page' }));
 
 		var isAdmin = window.location.pathname.indexOf('/wp-admin') !== -1;
 		var curPath = window.location.pathname;
-		var home = (config && config.homeUrl) || '/';
-
-		if (isAdmin) {
-			var optHome = element('option', { value: home, text: 'Home Page' });
-			optHome.selected = true;
-			hubPageSelect.appendChild(optHome);
-			if (config && Array.isArray(config.sitePages)) {
-				config.sitePages.forEach(function (p) {
-					if (p.url && p.url !== home) {
-						hubPageSelect.appendChild(element('option', { value: p.url, text: (p.title || 'Page') + ' (' + p.type + ')' }));
-					}
-				});
-			}
-			hubPageSelect.appendChild(element('option', { value: '__current__', text: 'Current Admin Screen (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')' }));
-		} else {
-			var curOpt = element('option', { value: '__current__', text: 'Current Screen (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')' });
-			curOpt.selected = true;
-			hubPageSelect.appendChild(curOpt);
-			if (config && config.homeUrl && window.location.href !== config.homeUrl) {
-				hubPageSelect.appendChild(element('option', { value: config.homeUrl, text: 'Home Page' }));
-			}
-			if (config && Array.isArray(config.sitePages)) {
-				config.sitePages.forEach(function (p) {
-					if (p.url && p.url !== window.location.href && p.url !== config.homeUrl) {
-						hubPageSelect.appendChild(element('option', { value: p.url, text: (p.title || 'Page') + ' (' + p.type + ')' }));
-					}
-				});
-			}
-		}
-		hubPageSelect.appendChild(element('option', { value: '__custom__', text: 'Custom URL...' }));
-		hubPageWrap.appendChild(hubPageSelect);
-
-		var hubCustomWrap = element('div', { className: 'stillframe-hub-custom-wrap' });
-		hubCustomWrap.style.display = 'none';
-		var hubCustomInput = element('input', { type: 'url', className: 'stillframe-hub-input', placeholder: 'https://example.com/' });
-		hubCustomWrap.appendChild(hubCustomInput);
-		hubPageWrap.appendChild(hubCustomWrap);
-
-		hubPageSelect.addEventListener('change', function () {
-			hubCustomWrap.style.display = hubPageSelect.value === '__custom__' ? 'block' : 'none';
-			if (hubPageSelect.value === '__custom__') {
-				hubCustomInput.focus();
+		var hubPicker = createPagePicker({
+			pages: config && config.sitePages,
+			homeUrl: (config && config.homeUrl) || '',
+			includeCurrent: true,
+			currentLabel: (isAdmin ? 'Current Admin Screen' : 'Current Screen') + ' (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')',
+			onEscape: function () {
+				closeAllMenus();
+				directButton.focus();
 			}
 		});
+		hubPageWrap.appendChild(hubPicker.root);
 
 		// Multi-Device Selection Cards (Desktop, iPad, Mobile)
 		var hubDevGroup = element('div', { className: 'stillframe-dev-cards-group' });
@@ -3139,17 +3105,12 @@
 
 		hubSubmit.addEventListener('click', function (e) {
 			stopBar(e);
-			var targetUrl;
-			if (hubPageSelect.value === '__custom__') {
-				targetUrl = hubCustomInput.value.trim();
-				if (!targetUrl) {
-					hubCustomInput.focus();
-					return;
-				}
-			} else if (hubPageSelect.value === '__current__') {
+			var targetUrl = hubPicker.getValue();
+			if (targetUrl === '__current__') {
 				targetUrl = captureTargetUrl();
-			} else {
-				targetUrl = hubPageSelect.value;
+			} else if (!targetUrl) {
+				hubPicker.focusCustom();
+				return;
 			}
 
 			var selected = availableDevices.filter(function (d) {
@@ -3576,6 +3537,9 @@
 
 		snipKeyHandler = function (event) {
 			if (!snip) {
+				return;
+			}
+			if (event.target && event.target.closest && event.target.closest('.stillframe-picker')) {
 				return;
 			}
 			if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A') && !/^(INPUT|TEXTAREA|SELECT)$/.test((event.target && event.target.tagName) || '')) {
@@ -4328,6 +4292,307 @@
 		};
 		openResult(rect, Promise.resolve(blob), token);
 	};
+
+	// Searchable page picker shared by the capture panel and the Tools screen.
+	// getValue() returns '__current__', a URL, or '' when a custom URL is chosen but empty.
+	var pickerCount = 0;
+
+	function pickerTypeLabel(type) {
+		var label = String(type || '').replace(/[_-]+/g, ' ');
+		return label.charAt(0).toUpperCase() + label.slice(1);
+	}
+
+	function createPagePicker(opts) {
+		opts = opts || {};
+		var MAX_ROWS = 200;
+		var CUSTOM = '__custom__';
+		var uid = 'stillframe-picker-' + (++pickerCount);
+		var homeUrl = opts.homeUrl || '';
+		var entries = [];
+		var groupOrder = [];
+		var rows = [];
+		var activeIndex = -1;
+		var sel = '';
+		var searchTimer = 0;
+
+		function pathOf(url) {
+			try {
+				return new URL(url, window.location.href).pathname;
+			} catch (error) {
+				return url;
+			}
+		}
+
+		function addEntry(entry) {
+			if (groupOrder.indexOf(entry.group) === -1) {
+				groupOrder.push(entry.group);
+			}
+			entries.push(entry);
+		}
+
+		if (opts.includeCurrent) {
+			addEntry({ key: '__current__', title: opts.currentLabel || 'Current screen', path: window.location.pathname, type: '', parent: '', group: 'Current screen' });
+		}
+		if (homeUrl) {
+			addEntry({ key: homeUrl, title: 'Home', path: pathOf(homeUrl), type: '', parent: '', group: 'Home' });
+		}
+		(Array.isArray(opts.pages) ? opts.pages : []).forEach(function (p) {
+			if (!p || !p.url || p.url === homeUrl) {
+				return;
+			}
+			var type = String(p.type || 'page');
+			addEntry({
+				key: p.url,
+				title: p.title || 'Page',
+				path: p.path || pathOf(p.url),
+				type: type,
+				parent: p.parent || '',
+				group: type === 'page' ? 'Pages' : (type === 'post' ? 'Posts' : pickerTypeLabel(type))
+			});
+		});
+
+		sel = opts.includeCurrent ? '__current__' : (homeUrl || (entries.length ? entries[0].key : CUSTOM));
+
+		var root = element('div', { className: 'stillframe-picker' });
+
+		var customRow = element('div', { className: 'stillframe-picker__custom' });
+		var customInput = element('input', {
+			type: 'url',
+			className: 'stillframe-picker__input',
+			placeholder: 'Custom URL: paste any address...',
+			'aria-label': 'Custom URL',
+			autocomplete: 'off',
+			spellcheck: 'false'
+		});
+		var useButton = element('button', { type: 'button', className: 'stillframe-picker__use', text: 'Use' });
+		customRow.appendChild(customInput);
+		customRow.appendChild(useButton);
+
+		var search = element('input', {
+			type: 'text',
+			className: 'stillframe-picker__input stillframe-picker__search',
+			placeholder: 'Search pages by title, path or type...',
+			role: 'combobox',
+			'aria-label': 'Search pages',
+			'aria-expanded': 'true',
+			'aria-controls': uid + '-list',
+			'aria-autocomplete': 'list',
+			autocomplete: 'off',
+			spellcheck: 'false'
+		});
+		var list = element('div', { className: 'stillframe-picker__list', role: 'listbox', id: uid + '-list', 'aria-label': 'Pages' });
+		var summary = element('div', { className: 'stillframe-picker__summary', 'aria-live': 'polite' });
+
+		root.appendChild(customRow);
+		root.appendChild(search);
+		root.appendChild(list);
+		root.appendChild(summary);
+
+		function entryFor(key) {
+			for (var i = 0; i < entries.length; i++) {
+				if (entries[i].key === key) {
+					return entries[i];
+				}
+			}
+			return null;
+		}
+
+		function updateSummary() {
+			var label = '';
+			if (sel === CUSTOM) {
+				label = customInput.value.trim() || 'Enter a URL above';
+			} else {
+				var entry = entryFor(sel);
+				label = entry ? entry.title + (entry.path ? '  ' + entry.path : '') : sel;
+			}
+			summary.textContent = 'Target: ' + label;
+		}
+
+		function setActive(index, scroll) {
+			if (activeIndex > -1 && rows[activeIndex]) {
+				rows[activeIndex].node.classList.remove('is-active');
+			}
+			activeIndex = index;
+			if (index > -1 && rows[index]) {
+				rows[index].node.classList.add('is-active');
+				search.setAttribute('aria-activedescendant', rows[index].node.id);
+				if (scroll && rows[index].node.scrollIntoView) {
+					rows[index].node.scrollIntoView({ block: 'nearest' });
+				}
+			} else {
+				search.removeAttribute('aria-activedescendant');
+			}
+		}
+
+		function markSelected() {
+			rows.forEach(function (row) {
+				var on = row.entry.key === sel;
+				row.node.classList.toggle('is-selected', on);
+				row.node.setAttribute('aria-selected', on ? 'true' : 'false');
+			});
+			updateSummary();
+			if (typeof opts.onChange === 'function') {
+				opts.onChange(sel);
+			}
+		}
+
+		function select(entry) {
+			sel = entry.key;
+			customInput.value = '';
+			markSelected();
+		}
+
+		function render() {
+			var tokens = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+			var matched = entries.filter(function (entry) {
+				var hay = (entry.title + ' ' + entry.path + ' ' + entry.type + ' ' + entry.parent + ' ' + entry.group).toLowerCase();
+				return tokens.every(function (token) {
+					return hay.indexOf(token) !== -1;
+				});
+			});
+
+			list.textContent = '';
+			rows = [];
+			activeIndex = -1;
+			search.removeAttribute('aria-activedescendant');
+
+			var shown = matched.slice(0, MAX_ROWS);
+			groupOrder.forEach(function (group) {
+				var inGroup = shown.filter(function (entry) {
+					return entry.group === group;
+				});
+				if (!inGroup.length) {
+					return;
+				}
+				list.appendChild(element('div', { className: 'stillframe-picker__group', role: 'presentation', text: group }));
+				inGroup.forEach(function (entry) {
+					var node = element('div', {
+						className: 'stillframe-picker__row' + (entry.key === sel ? ' is-selected' : ''),
+						role: 'option',
+						id: uid + '-o' + rows.length,
+						'aria-selected': entry.key === sel ? 'true' : 'false'
+					});
+					var head = element('span', { className: 'stillframe-picker__head' });
+					head.appendChild(element('span', { className: 'stillframe-picker__title', text: entry.title }));
+					if (entry.type) {
+						head.appendChild(element('span', { className: 'stillframe-picker__chip', text: pickerTypeLabel(entry.type) }));
+					}
+					node.appendChild(head);
+					node.appendChild(element('span', {
+						className: 'stillframe-picker__path',
+						text: (entry.parent ? entry.parent + '  ' : '') + entry.path
+					}));
+					node.addEventListener('mousedown', function (event) {
+						event.preventDefault();
+					});
+					node.addEventListener('click', function () {
+						select(entry);
+					});
+					rows.push({ entry: entry, node: node });
+					list.appendChild(node);
+				});
+			});
+
+			if (!matched.length) {
+				list.appendChild(element('div', { className: 'stillframe-picker__note', text: 'No matching pages. Use the Custom URL field above.' }));
+			} else if (matched.length > MAX_ROWS) {
+				list.appendChild(element('div', {
+					className: 'stillframe-picker__note',
+					text: 'Showing ' + MAX_ROWS + ' of ' + matched.length + '. Keep typing to narrow the list.'
+				}));
+			}
+
+			if (tokens.length && rows.length) {
+				setActive(0, false);
+			}
+		}
+
+		function commitCustom() {
+			if (!customInput.value.trim()) {
+				customInput.focus();
+				return;
+			}
+			sel = CUSTOM;
+			markSelected();
+		}
+
+		useButton.addEventListener('click', commitCustom);
+		customInput.addEventListener('input', function () {
+			if (customInput.value.trim()) {
+				commitCustom();
+			}
+		});
+		customInput.addEventListener('keydown', function (event) {
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				event.stopPropagation();
+				commitCustom();
+			} else if (event.key === 'Escape' && typeof opts.onEscape === 'function') {
+				event.preventDefault();
+				event.stopPropagation();
+				opts.onEscape();
+			}
+		});
+
+		search.addEventListener('input', function () {
+			window.clearTimeout(searchTimer);
+			searchTimer = window.setTimeout(render, 80);
+		});
+		search.addEventListener('keydown', function (event) {
+			var key = event.key;
+			if (key === 'ArrowDown' || key === 'ArrowUp') {
+				event.preventDefault();
+				event.stopPropagation();
+				if (!rows.length) {
+					return;
+				}
+				var next = activeIndex + (key === 'ArrowDown' ? 1 : -1);
+				if (next < 0) {
+					next = rows.length - 1;
+				} else if (next >= rows.length) {
+					next = 0;
+				}
+				setActive(next, true);
+			} else if (key === 'Enter') {
+				event.preventDefault();
+				event.stopPropagation();
+				if (activeIndex > -1 && rows[activeIndex]) {
+					select(rows[activeIndex].entry);
+				}
+			} else if (key === 'Escape') {
+				event.preventDefault();
+				event.stopPropagation();
+				if (search.value) {
+					search.value = '';
+					window.clearTimeout(searchTimer);
+					render();
+				} else if (typeof opts.onEscape === 'function') {
+					opts.onEscape();
+				}
+			}
+		});
+
+		render();
+		updateSummary();
+
+		return {
+			root: root,
+			getValue: function () {
+				if (sel === CUSTOM) {
+					return customInput.value.trim();
+				}
+				return sel;
+			},
+			focusCustom: function () {
+				customInput.focus();
+			},
+			isCustom: function () {
+				return sel === CUSTOM;
+			}
+		};
+	}
+
+	api.createPagePicker = createPagePicker;
 
 	api.openResult = openResult;
 

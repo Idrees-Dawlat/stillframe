@@ -1,9 +1,9 @@
 (function () {
 	'use strict';
 
-	var pageSelect = document.getElementById('stillframe-target-page');
-	var customUrlWrap = document.getElementById('stillframe-custom-url-wrap');
-	var customUrlInput = document.getElementById('stillframe-custom-url');
+	var pickerMount = document.getElementById('stillframe-target-page');
+	var toolsData = window.StillframeToolsData || {};
+	var pagePicker = null;
 	var startBtn = document.getElementById('stillframe-start-multicapture');
 
 	var DEVICE_META = {
@@ -40,27 +40,16 @@
 		});
 	});
 
-	if (pageSelect) {
-		pageSelect.addEventListener('change', function () {
-			var isCustom = pageSelect.value === '__custom__';
-			if (customUrlWrap) {
-				customUrlWrap.hidden = !isCustom;
-				customUrlWrap.style.display = isCustom ? 'block' : 'none';
-			}
-			if (isCustom && customUrlInput) {
-				customUrlInput.focus();
-			}
+	if (pickerMount && window.StillframeCapture && typeof window.StillframeCapture.createPagePicker === 'function') {
+		pagePicker = window.StillframeCapture.createPagePicker({
+			pages: toolsData.pages,
+			homeUrl: toolsData.homeUrl || ''
 		});
+		pickerMount.appendChild(pagePicker.root);
 	}
 
 	function getTargetUrl() {
-		if (!pageSelect) {
-			return '';
-		}
-		if (pageSelect.value === '__custom__') {
-			return customUrlInput ? customUrlInput.value.trim() : '';
-		}
-		return pageSelect.value.trim();
+		return pagePicker ? pagePicker.getValue() : '';
 	}
 
 	function getSelectedDevices() {
@@ -89,8 +78,8 @@
 		var url = getTargetUrl();
 		if (!url) {
 			window.alert('Please select a target page or enter a URL to capture.');
-			if (customUrlInput && pageSelect && pageSelect.value === '__custom__') {
-				customUrlInput.focus();
+			if (pagePicker) {
+				pagePicker.focusCustom();
 			}
 			return;
 		}

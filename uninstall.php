@@ -18,3 +18,4 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 delete_transient( 'stillframe_site_pages' );
+delete_transient( 'stillframe_site_pages_v2' );
