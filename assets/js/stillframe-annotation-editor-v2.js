@@ -16,7 +16,7 @@
 		return;
 	}
 
-	var FONT = '-apple-system, "Segoe UI", Roboto, sans-serif';
+	var FONT = 'Arial, Helvetica, sans-serif';
 	var DEFAULT_COLOR = '#ef4444';
 	var DEFAULT_SIZE = 4;
 	var TOOLS = { select: 1, pen: 1, circle: 1, arrow: 1, rect: 1, highlight: 1, text: 1, step: 1, blur: 1, pixelate: 1 };
@@ -152,10 +152,12 @@
 		return styleControls(group);
 	}
 
-	function makeText(x, y, color, fontSize) {
-		var text = new fabric.IText('Text', {
+	function makeText(x, y, color, fontSize, width) {
+		var text = new fabric.Textbox('Text', {
 			left: x,
 			top: y,
+			width: width,
+			splitByGrapheme: false,
 			fontFamily: FONT,
 			fontWeight: '700',
 			fontSize: fontSize,
@@ -387,6 +389,18 @@
 			canvas.requestRenderAll();
 		}
 
+		// After placing a mark, switch to Select so it can be moved or resized straight away.
+		function selectAfter(obj) {
+			setToolInternal('select');
+			if (typeof settings.onToolChange === 'function') {
+				settings.onToolChange('select');
+			}
+			if (obj && canvas.contains(obj)) {
+				canvas.setActiveObject(obj);
+			}
+			canvas.requestRenderAll();
+		}
+
 		function scenePoint(event) {
 			var scene = sceneSize();
 			var p = canvas.getScenePoint(event);
@@ -476,7 +490,7 @@
 				return;
 			}
 			if (tool === 'text') {
-				var text = makeText(p.x, p.y, color, (12 + size * 2.5) * unit());
+				var text = makeText(p.x, p.y, color, (12 + size * 2.5) * unit(), 320 * unit());
 				text.on('editing:entered', function () {
 					if (text.hiddenTextarea) {
 						text.hiddenTextarea.classList.add('stillframe-text-input');
@@ -489,6 +503,7 @@
 						restoring = false;
 					}
 					commit();
+					selectAfter(text);
 				});
 				restoring = true;
 				canvas.add(text);
@@ -540,6 +555,7 @@
 				d.obj.setCoords();
 			}
 			commit();
+			selectAfter(d.obj);
 		});
 
 		canvas.on('path:created', function (opt) {
@@ -549,7 +565,14 @@
 			}
 			commit();
 		});
-		canvas.on('object:modified', function () {
+		// Resizing text with a corner handle changes its size and box, never a stretched scale.
+		canvas.on('object:modified', function (opt) {
+			var t = opt && opt.target;
+			if (t && t.sfType === 'text' && (t.scaleX !== 1 || t.scaleY !== 1)) {
+				var k = t.scaleX;
+				t.set({ fontSize: t.fontSize * k, width: t.width * k, strokeWidth: Math.max(2, t.fontSize * k / 6), scaleX: 1, scaleY: 1 });
+				t.setCoords();
+			}
 			commit();
 		});
 
@@ -732,6 +755,10 @@
 				history = [];
 				future = [];
 				return restore(JSON.stringify(validMarks(newMarks)));
+			},
+			// For tests and debugging only.
+			getCanvas: function () {
+				return canvas;
 			},
 			flatten: function () {
 				return api.flattenImageAndMarks(image, serialize());

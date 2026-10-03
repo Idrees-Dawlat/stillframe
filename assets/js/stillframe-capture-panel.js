@@ -2170,7 +2170,8 @@
 			width: item.width || 1440,
 			height: item.height || 900,
 			scale: 1,
-			url: item.url || window.location.href
+			url: item.url || window.location.href,
+			fromRecent: true
 		};
 		recentGetBlob(item.id).then(function (blob) {
 			if (!blob || token !== session) {
@@ -2960,7 +2961,7 @@
 				setResultLoading(false);
 				setStatus('');
 				flushPending();
-				if (captured.blob) {
+				if (captured.blob && !(rect && rect.fromRecent)) {
 					saveCaptureToRecent(captured.blob, captured.width, captured.height, document.title, captured.url);
 				}
 			}).catch(function (error) {
@@ -3287,7 +3288,7 @@
 
 		// --- Section A: Devices Button & Menu (Only Framed Viewports!) ---
 		var devWrap = element('div', { className: 'stillframe-snip__devices-wrap' });
-		var devButton = iconButton('devices', text('devices') || 'Devices', 'stillframe-snip__mode', true);
+		var devButton = iconButton('devices', tr('options', 'Options'), 'stillframe-snip__mode', true);
 		var devChevron = iconSvg('chevronDown', 11);
 		devChevron.classList.add('stillframe-snip__chevron');
 		devButton.appendChild(devChevron);
@@ -3343,18 +3344,19 @@
 			sec1Grid.appendChild(devItem);
 		});
 
-		devMenu.appendChild(sec1Title);
-		devMenu.appendChild(sec1Grid);
 
-		var engineLabel = element('label', { className: 'stillframe-hub-toggle', title: 'Takes a real screenshot of this tab. Your browser asks to share the tab. Nothing is uploaded.' });
+		var engineLabel = element('label', { className: 'stillframe-hub-toggle sfd-engine' });
 		var engineCb = element('input', { type: 'checkbox', className: 'stillframe-hub-toggle__input' });
 		engineCb.checked = exactPref();
 		engineCb.addEventListener('change', function () {
 			setExactPref(engineCb.checked);
 		});
+		var engineText = element('span', { className: 'sfd-engine__text' });
+		engineText.appendChild(element('b', { text: tr('engineTitle', 'Pixel-perfect capture') }));
+		engineText.appendChild(element('small', { text: tr('engineHelp', 'Your browser asks to share this tab, so the screenshot matches the screen exactly. Nothing is uploaded.') }));
 		engineLabel.appendChild(engineCb);
 		engineLabel.appendChild(element('span', { className: 'stillframe-hub-toggle__track' }));
-		engineLabel.appendChild(element('span', { text: 'Exact capture (browser asks to share this tab)' }));
+		engineLabel.appendChild(engineText);
 		devMenu.appendChild(engineLabel);
 
 		function toggleMenu(menu, button, onOpen) {
@@ -3394,250 +3396,148 @@
 		var directMenu = element('div', { className: 'stillframe-snip__direct-menu' });
 		directMenu.hidden = true;
 
-		var directTitle = element('div', { className: 'stillframe-hub-sec-title', text: tr('directTitle', 'Direct Page Capture') });
+		var directTitle = element('div', { className: 'stillframe-hub-sec-title', text: tr('directTitle', 'Capture a page') });
 
-		// Page Select
-		var hubPageWrap = element('div', { className: 'stillframe-hub-field' });
-		hubPageWrap.appendChild(element('span', { className: 'stillframe-hub-label', text: tr('targetPage', 'Target Page') }));
-
+		// Page
 		var isAdmin = window.location.pathname.indexOf('/wp-admin') !== -1;
 		var curPath = window.location.pathname;
+
+		function sfdRow(label, control) {
+			var row = element('div', { className: 'sfd-row' });
+			row.appendChild(element('span', { className: 'sfd-label', text: label }));
+			row.appendChild(control);
+			return row;
+		}
+
 		var hubPicker = createPagePicker({
 			pages: config && config.sitePages,
 			homeUrl: (config && config.homeUrl) || '',
 			includeCurrent: true,
-			currentLabel: (isAdmin ? tr('currentAdmin', 'Current Admin Screen') : tr('currentScreen', 'Current Screen')) + ' (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')',
+			currentLabel: (isAdmin ? tr('currentAdmin', 'Current Admin Screen') : tr('currentScreen', 'Current Screen')) + ' (' + (curPath.length > 24 ? curPath.slice(0, 22) + '...' : curPath) + ')',
 			onEscape: function () {
 				closeAllMenus();
 				directButton.focus();
 			}
 		});
-		hubPageWrap.appendChild(hubPicker.root);
 
-		// Multi-Device Selection Cards (Desktop, iPad, Mobile)
-		var hubDevGroup = element('div', { className: 'stillframe-dev-cards-group' });
-		var hubDevHeader = element('div', { className: 'stillframe-dev-cards-header' });
-		hubDevHeader.appendChild(element('span', { className: 'stillframe-dev-cards-title', text: tr('selectDevices', 'Select Devices to Capture') }));
-
-		var hubDevQuickToggle = element('button', {
-			type: 'button',
-			className: 'stillframe-dev-cards-quick',
-			text: tr('desktopOnly', 'Desktop Only')
-		});
-		hubDevHeader.appendChild(hubDevQuickToggle);
-		hubDevGroup.appendChild(hubDevHeader);
-
-		var hubDevGrid = element('div', { className: 'stillframe-dev-cards-grid' });
-
+		// Devices: three compact toggles.
 		var availableDevices = [
-			{ id: 'desktop', label: 'Desktop', width: 1440, estHeight: 900, icon: 'desktop', badge: '1440px' },
-			{ id: 'tablet',  label: 'iPad',    width: 834,  estHeight: 1112, icon: 'tablet',  badge: '834px' },
-			{ id: 'mobile',  label: 'Mobile',  width: 390,  estHeight: 844,  icon: 'mobile',  badge: '390px' }
+			{ id: 'desktop', label: 'Desktop', width: 1440, estHeight: 900, icon: 'desktop' },
+			{ id: 'tablet', label: 'iPad', width: 834, estHeight: 1112, icon: 'tablet' },
+			{ id: 'mobile', label: 'Mobile', width: 390, estHeight: 844, icon: 'mobile' }
 		];
-
 		var devCards = {};
-		availableDevices.forEach(function (d) {
-			var card = element('div', {
-				className: 'stillframe-dev-card is-selected',
-				tabIndex: 0,
-				role: 'checkbox',
-				'aria-checked': 'true',
-				title: 'Toggle ' + d.label + ' (' + d.badge + ')'
-			});
+		var hubDevBox = element('div', { className: 'sfd-chips', role: 'group', 'aria-label': tr('selectDevices', 'Devices') });
 
-			var checkBadge = element('span', { className: 'stillframe-dev-card__check' });
-			checkBadge.appendChild(iconSvg('check', 10));
-			card.appendChild(checkBadge);
-
-			var previewFrame = element('span', { className: 'stillframe-dev-card__frame', 'aria-hidden': 'true' });
-			previewFrame.style.height = '38px';
-			previewFrame.style.width = Math.round(38 * d.width / d.estHeight) + 'px';
-			var iconEl = iconSvg(d.icon, 16);
-			iconEl.classList.add('stillframe-dev-card__icon');
-			previewFrame.appendChild(iconEl);
-			card.appendChild(previewFrame);
-
-			card.appendChild(element('span', { className: 'stillframe-dev-card__name', text: tr('dev_' + d.id, d.label) }));
-			card.appendChild(element('span', { className: 'stillframe-dev-card__dim', text: d.badge }));
-
-			function toggleCard() {
-				var countSelected = Object.keys(devCards).filter(function (k) {
-					return devCards[k].classList.contains('is-selected');
-				}).length;
-
-				if (card.classList.contains('is-selected')) {
-					if (countSelected > 1) {
-						card.classList.remove('is-selected');
-						card.setAttribute('aria-checked', 'false');
-					}
-				} else {
-					card.classList.add('is-selected');
-					card.setAttribute('aria-checked', 'true');
-				}
-				updateSubmitLabel();
-			}
-
-			card.addEventListener('click', function (e) {
-				stopBar(e);
-				toggleCard();
-			});
-			card.addEventListener('keydown', function (e) {
-				if (e.key === ' ' || e.key === 'Enter') {
-					e.preventDefault();
-					toggleCard();
-				}
-			});
-
-			devCards[d.id] = card;
-			hubDevGrid.appendChild(card);
-		});
-		hubDevGroup.appendChild(hubDevGrid);
-
-		hubDevQuickToggle.addEventListener('click', function (e) {
-			stopBar(e);
-			var allSelected = availableDevices.every(function (d) {
+		function selectedDevices() {
+			return availableDevices.filter(function (d) {
 				return devCards[d.id].classList.contains('is-selected');
 			});
-			availableDevices.forEach(function (d) {
-				var card = devCards[d.id];
-				if (allSelected) {
-					if (d.id === 'desktop') {
-						card.classList.add('is-selected');
-						card.setAttribute('aria-checked', 'true');
-					} else {
-						card.classList.remove('is-selected');
-						card.setAttribute('aria-checked', 'false');
-					}
-				} else {
-					card.classList.add('is-selected');
-					card.setAttribute('aria-checked', 'true');
-				}
+		}
+
+		availableDevices.forEach(function (d) {
+			var chip = element('button', {
+				type: 'button',
+				className: 'sfd-chip is-selected',
+				'aria-pressed': 'true',
+				title: tr('dev_' + d.id, d.label) + ' (' + d.width + 'px)'
 			});
-			updateSubmitLabel();
+			chip.appendChild(iconSvg(d.icon, 14));
+			chip.appendChild(element('span', { text: tr('dev_' + d.id, d.label) }));
+			chip.appendChild(element('em', { text: String(d.width) }));
+			chip.addEventListener('click', function (e) {
+				stopBar(e);
+				var on = chip.classList.contains('is-selected');
+				if (on && selectedDevices().length < 2) {
+					return;
+				}
+				chip.classList.toggle('is-selected', !on);
+				chip.setAttribute('aria-pressed', on ? 'false' : 'true');
+				updateSubmitLabel();
+			});
+			devCards[d.id] = chip;
+			hubDevBox.appendChild(chip);
 		});
 
-		// Admin Bar Option
+		// Segmented choice with one active option.
+		function makeSeg(options, initial, onPick) {
+			var box = element('div', { className: 'sfd-seg', role: 'group' });
+			options.forEach(function (opt) {
+				var btn = element('button', {
+					type: 'button',
+					className: 'sfd-seg__btn' + (opt.value === initial ? ' is-active' : ''),
+					'aria-pressed': opt.value === initial ? 'true' : 'false',
+					text: opt.label,
+					title: opt.title || ''
+				});
+				btn.addEventListener('click', function (e) {
+					stopBar(e);
+					Array.prototype.forEach.call(box.children, function (other) {
+						var on = other === btn;
+						other.classList.toggle('is-active', on);
+						other.setAttribute('aria-pressed', on ? 'true' : 'false');
+					});
+					onPick(opt.value);
+				});
+				box.appendChild(btn);
+			});
+			return box;
+		}
+
+		var RES_HELP = {
+			'1': tr('res1Help', 'Same pixels as the screen. Smallest files.'),
+			'2': tr('res2Help', 'Sharp on high-density displays. Recommended.'),
+			'3': tr('res3Help', 'Maximum detail. Large files; very long pages may be reduced.')
+		};
+		var HEIGHT_HELP = {
+			viewport: tr('heightViewportHelp', 'Only the first screen (above the fold).'),
+			fullpage: tr('heightFullHelp', 'The entire page, top to bottom.')
+		};
+		var hubResSelected = '2';
+		var hubHeightSelected = 'viewport';
+		var hubHelp = element('p', { className: 'sfd-help' });
+
+		function updateHelp() {
+			hubHelp.textContent = RES_HELP[hubResSelected] + ' ' + HEIGHT_HELP[hubHeightSelected];
+		}
+
+		var hubResSeg = makeSeg([
+			{ value: '1', label: '1x', title: RES_HELP['1'] },
+			{ value: '2', label: '2x', title: RES_HELP['2'] },
+			{ value: '3', label: '3x', title: RES_HELP['3'] }
+		], '2', function (value) {
+			hubResSelected = value;
+			updateHelp();
+		});
+		var hubHeightSeg = makeSeg([
+			{ value: 'viewport', label: tr('heightViewport', 'First screen'), title: HEIGHT_HELP.viewport },
+			{ value: 'fullpage', label: tr('heightFull', 'Full page'), title: HEIGHT_HELP.fullpage }
+		], 'viewport', function (value) {
+			hubHeightSelected = value;
+			updateHelp();
+		});
+		updateHelp();
+
+		// Admin bar option
 		var hubAdminLabel = element('label', { className: 'stillframe-hub-toggle' });
 		var hubAdminCb = element('input', { type: 'checkbox', className: 'stillframe-hub-toggle__input' });
 		hubAdminCb.checked = true;
 		hubAdminLabel.appendChild(hubAdminCb);
 		hubAdminLabel.appendChild(element('span', { className: 'stillframe-hub-toggle__track' }));
-		hubAdminLabel.appendChild(element('span', { text: tr('hideAdminBar', 'Hide admin bar in screenshot') }));
+		hubAdminLabel.appendChild(element('span', { text: tr('hideAdminBar', 'Hide the admin bar in the screenshot') }));
 
-		// Resolution Quality - pill selector (1x / 2x / 3x)
-		var hubResField = element('div', { className: 'stillframe-hub-field' });
-		hubResField.appendChild(element('span', { className: 'stillframe-hub-label', text: tr('resQuality', 'Resolution Quality') }));
-		var hubResRow = element('div', { className: 'stillframe-hub-res-row' });
-		var hubResOptions = [
-			{ value: '1', label: tr('res1', '1x Standard') },
-			{ value: '2', label: tr('res2', '2x Retina'), default: true },
-			{ value: '3', label: tr('res3', '3x Ultra') }
-		];
-		var hubResSelected = '2';
-		hubResOptions.forEach(function (opt) {
-			var pill = element('button', {
-				type: 'button',
-				className: 'stillframe-hub-pill' + (opt.default ? ' is-active' : ''),
-				text: opt.label,
-				'data-value': opt.value
-			});
-			pill.addEventListener('click', function (e) {
-				stopBar(e);
-				hubResSelected = opt.value;
-				hubResHelp.textContent = RES_HELP[opt.value] || '';
-				updateSizeLine();
-				Array.prototype.forEach.call(hubResRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
-					p.classList.toggle('is-active', p === pill);
-				});
-			});
-			hubResRow.appendChild(pill);
-		});
-		hubResField.appendChild(hubResRow);
-		var RES_HELP = {
-			'1': tr('res1Help', 'Same pixels as the screen. Smallest files, good for docs and chat.'),
-			'2': tr('res2Help', 'Sharp on modern high-density displays. Recommended.'),
-			'3': tr('res3Help', 'Maximum detail for print or zooming. Large files; very long pages may be reduced automatically.')
-		};
-		var hubResHelp = element('span', { className: 'stillframe-hub-help', text: RES_HELP['2'] });
-		hubResField.appendChild(hubResHelp);
-
-		// Capture Height - pill selector (Viewport / Full Page)
-		var hubHeightField = element('div', { className: 'stillframe-hub-field' });
-		hubHeightField.appendChild(element('span', { className: 'stillframe-hub-label', text: tr('captureHeight', 'Capture Height') }));
-		var hubHeightRow = element('div', { className: 'stillframe-hub-res-row' });
-		var hubHeightOptions = [
-			{ value: 'viewport', label: tr('heightViewport', 'Viewport'), default: true },
-			{ value: 'fullpage', label: tr('heightFull', 'Full Page') }
-		];
-		var hubHeightSelected = 'viewport';
-		hubHeightOptions.forEach(function (opt) {
-			var pill = element('button', {
-				type: 'button',
-				className: 'stillframe-hub-pill' + (opt.default ? ' is-active' : ''),
-				text: opt.label,
-				'data-value': opt.value
-			});
-			pill.addEventListener('click', function (e) {
-				stopBar(e);
-				hubHeightSelected = opt.value;
-				hubHeightHelp.textContent = HEIGHT_HELP[opt.value] || '';
-				updateSizeLine();
-				Array.prototype.forEach.call(hubHeightRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
-					p.classList.toggle('is-active', p === pill);
-				});
-			});
-			hubHeightRow.appendChild(pill);
-		});
-		hubHeightField.appendChild(hubHeightRow);
-		var HEIGHT_HELP = {
-			viewport: tr('heightViewportHelp', 'Only the first screen (above the fold).'),
-			fullpage: tr('heightFullHelp', 'The entire page, top to bottom.')
-		};
-		var hubHeightHelp = element('span', { className: 'stillframe-hub-help', text: HEIGHT_HELP.viewport });
-		hubHeightField.appendChild(hubHeightHelp);
-		var hubSizeLine = element('span', { className: 'stillframe-hub-size' });
-
-		// Capture Button (NO lightning emoji! Uses clean camera SVG icon)
-		var hubSubmit = element('button', {
-			type: 'button',
-			className: 'stillframe-hub-submit'
-		});
-		hubSubmit.appendChild(iconSvg('camera', 16));
-		var hubSubmitText = element('span', { text: tr('captureAll', 'Capture All 3 Devices & Open') });
+		var hubSubmit = element('button', { type: 'button', className: 'sfd-submit' });
+		hubSubmit.appendChild(iconSvg('camera', 15));
+		var hubSubmitText = element('span', { text: tr('captureAll', 'Capture 3 devices') });
 		hubSubmit.appendChild(hubSubmitText);
 
-		// Approximate output size for the chosen devices, quality and height.
-		function updateSizeLine() {
-			var scaleNow = parseInt(hubResSelected, 10) || 2;
-			var full = hubHeightSelected === 'fullpage';
-			var parts = availableDevices.filter(function (d) {
-				return devCards[d.id] && devCards[d.id].classList.contains('is-selected');
-			}).map(function (d) {
-				var w = d.width * scaleNow;
-				if (full) {
-					return d.label + ' ' + w + ' px wide, full height';
-				}
-				var h = d.estHeight * scaleNow;
-				return d.label + ' ' + w + ' \u00d7 ' + h + ' px, about ' + formatBytes(Math.round(w * h * 0.5));
-			});
-			hubSizeLine.textContent = parts.join(' \u00b7 ');
-		}
-
 		function updateSubmitLabel() {
-			var selected = availableDevices.filter(function (d) {
-				return devCards[d.id].classList.contains('is-selected');
-			});
-			if (selected.length === 3) {
-				hubSubmitText.textContent = tr('captureAll', 'Capture All 3 Devices & Open');
-				hubDevQuickToggle.textContent = tr('desktopOnly', 'Desktop Only');
-			} else if (selected.length === 2) {
-				hubSubmitText.textContent = tr('captureN', 'Capture %d Devices & Open').replace('%d', String(selected.length));
-				hubDevQuickToggle.textContent = tr('selectAll', 'Select All (3)');
-			} else if (selected.length === 1) {
-				hubSubmitText.textContent = tr('captureOne', 'Capture %s & Open').replace('%s', selected[0].label);
-				hubDevQuickToggle.textContent = tr('selectAll', 'Select All (3)');
+			var selected = selectedDevices();
+			if (selected.length === 1) {
+				hubSubmitText.textContent = tr('captureOne', 'Capture %s').replace('%s', selected[0].label);
+			} else {
+				hubSubmitText.textContent = tr('captureN', 'Capture %d devices').replace('%d', String(selected.length));
 			}
-			updateSizeLine();
 		}
 
 		hubSubmit.addEventListener('click', function (e) {
@@ -3650,9 +3550,7 @@
 				return;
 			}
 
-			var selected = availableDevices.filter(function (d) {
-				return devCards[d.id].classList.contains('is-selected');
-			});
+			var selected = selectedDevices();
 			if (!selected.length) {
 				selected = availableDevices;
 			}
@@ -3665,17 +3563,17 @@
 			openMultiDirectCapture(targetUrl, selected, targetScale, hideAdmin, isFullPage);
 		});
 
-		directMenu.appendChild(directTitle);
-		directMenu.appendChild(hubPageWrap);
-		directMenu.appendChild(hubDevGroup);
-		directMenu.appendChild(hubAdminLabel);
-		directMenu.appendChild(hubResField);
-		directMenu.appendChild(hubHeightField);
-		directMenu.appendChild(hubSizeLine);
-		var hubFooter = element('div', { className: 'stillframe-hub-footer' });
+		var hubFooter = element('div', { className: 'sfd-foot' });
 		hubFooter.appendChild(hubSubmit);
+
+		directMenu.appendChild(directTitle);
+		directMenu.appendChild(sfdRow(tr('targetPage', 'Page'), hubPicker.root));
+		directMenu.appendChild(sfdRow(tr('selectDevices', 'Devices'), hubDevBox));
+		directMenu.appendChild(sfdRow(tr('resQuality', 'Quality'), hubResSeg));
+		directMenu.appendChild(sfdRow(tr('captureHeight', 'Height'), hubHeightSeg));
+		directMenu.appendChild(hubHelp);
+		directMenu.appendChild(hubAdminLabel);
 		directMenu.appendChild(hubFooter);
-		updateSizeLine();
 
 		directButton.addEventListener('click', function (event) {
 			stopBar(event);
@@ -4837,13 +4735,18 @@
 		openResult(rect, Promise.resolve(blob), token);
 	};
 
-	// Searchable page picker shared by the capture panel and the Tools screen.
-	// getValue() returns '__current__', a URL, or '' when a custom URL is chosen but empty.
+	// Page dropdown with a search box, shared by the capture panel and the Tools screen.
+	// getValue() returns '__current__', a URL, or '' when nothing usable is chosen.
+	// Paste or type a URL in the search box and it appears as the first choice.
 	var pickerCount = 0;
 
 	function pickerTypeLabel(type) {
 		var label = String(type || '').replace(/[_-]+/g, ' ');
 		return label.charAt(0).toUpperCase() + label.slice(1);
+	}
+
+	function pickerLooksLikeUrl(value) {
+		return /^https?:\/\/\S+$/i.test(value) || /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(value);
 	}
 
 	function createPagePicker(opts) {
@@ -4857,7 +4760,9 @@
 		var rows = [];
 		var activeIndex = -1;
 		var sel = '';
+		var customUrl = '';
 		var searchTimer = 0;
+		var pendingRender = false;
 
 		function pathOf(url) {
 			try {
@@ -4875,7 +4780,7 @@
 		}
 
 		if (opts.includeCurrent) {
-			addEntry({ key: '__current__', title: opts.currentLabel || tr('pickCurrent', 'Current screen'), path: window.location.pathname, type: '', parent: '', group: tr('pickCurrent', 'Current screen') });
+			addEntry({ key: '__current__', title: opts.currentLabel || tr('pickCurrent', 'Current screen'), path: '', type: '', parent: '', group: tr('pickCurrent', 'Current screen') });
 		}
 		if (homeUrl) {
 			addEntry({ key: homeUrl, title: tr('pickHome', 'Home'), path: pathOf(homeUrl), type: '', parent: '', group: tr('pickHome', 'Home') });
@@ -4895,27 +4800,20 @@
 			});
 		});
 
-		sel = opts.includeCurrent ? '__current__' : (homeUrl || (entries.length ? entries[0].key : CUSTOM));
+		sel = opts.includeCurrent ? '__current__' : (homeUrl || (entries.length ? entries[0].key : ''));
 
-		var root = element('div', { className: 'stillframe-picker' });
+		var root = element('div', { className: 'sfp' });
+		var trigger = element('button', { type: 'button', className: 'sfp__trigger', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' });
+		var summary = element('span', { className: 'sfp__summary', 'aria-live': 'polite' });
+		trigger.appendChild(summary);
+		trigger.appendChild(iconSvg('chevronDown', 12));
 
-		var customRow = element('div', { className: 'stillframe-picker__custom' });
-		var customInput = element('input', {
-			type: 'url',
-			className: 'stillframe-picker__input',
-			placeholder: tr('pickCustomPlaceholder', 'Custom URL: paste any address...'),
-			'aria-label': tr('pickCustom', 'Custom URL'),
-			autocomplete: 'off',
-			spellcheck: 'false'
-		});
-		var useButton = element('button', { type: 'button', className: 'stillframe-picker__use', text: tr('pickUse', 'Use') });
-		customRow.appendChild(customInput);
-		customRow.appendChild(useButton);
-
+		var drop = element('div', { className: 'sfp__drop' });
+		drop.hidden = true;
 		var search = element('input', {
 			type: 'text',
-			className: 'stillframe-picker__input stillframe-picker__search',
-			placeholder: tr('pickSearchPlaceholder', 'Search pages by title, path or type...'),
+			className: 'sfp__search',
+			placeholder: tr('pickSearchPlaceholder', 'Search pages or paste a URL'),
 			role: 'combobox',
 			'aria-label': tr('pickSearch', 'Search pages'),
 			'aria-expanded': 'true',
@@ -4924,43 +4822,11 @@
 			autocomplete: 'off',
 			spellcheck: 'false'
 		});
-		var list = element('div', { className: 'stillframe-picker__list', role: 'listbox', id: uid + '-list', 'aria-label': 'Pages' });
-		var summary = element('div', { className: 'stillframe-picker__summary', 'aria-live': 'polite' });
-
-		var trigger = element('button', { type: 'button', className: 'stillframe-picker__trigger', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' });
-		trigger.appendChild(summary);
-		trigger.appendChild(iconSvg('chevronDown', 12));
-		var drop = element('div', { className: 'stillframe-picker__drop' });
-		drop.hidden = true;
-		drop.appendChild(customRow);
+		var list = element('div', { className: 'sfp__list', role: 'listbox', id: uid + '-list', 'aria-label': tr('pickPages', 'Pages') });
 		drop.appendChild(search);
 		drop.appendChild(list);
 		root.appendChild(trigger);
 		root.appendChild(drop);
-
-		function openDrop() {
-			drop.hidden = false;
-			trigger.setAttribute('aria-expanded', 'true');
-			root.classList.add('is-open');
-			search.focus();
-		}
-
-		function closeDrop(refocus) {
-			drop.hidden = true;
-			trigger.setAttribute('aria-expanded', 'false');
-			root.classList.remove('is-open');
-			if (refocus) {
-				trigger.focus();
-			}
-		}
-
-		trigger.addEventListener('click', function () {
-			if (drop.hidden) {
-				openDrop();
-			} else {
-				closeDrop(false);
-			}
-		});
 
 		function entryFor(key) {
 			for (var i = 0; i < entries.length; i++) {
@@ -4974,12 +4840,44 @@
 		function updateSummary() {
 			var label = '';
 			if (sel === CUSTOM) {
-				label = customInput.value.trim() || tr('pickEnterUrl', 'Enter a URL below');
+				label = customUrl;
 			} else {
 				var entry = entryFor(sel);
 				label = entry ? entry.title + (entry.path ? '  ' + entry.path : '') : sel;
 			}
-			summary.textContent = label;
+			summary.textContent = label || tr('pickChoose', 'Choose a page');
+		}
+
+		function onOutside(event) {
+			if (!root.contains(event.target)) {
+				closeDrop(false);
+			}
+		}
+
+		function openDrop() {
+			if (!drop.hidden) {
+				return;
+			}
+			drop.hidden = false;
+			trigger.setAttribute('aria-expanded', 'true');
+			root.classList.add('is-open');
+			document.addEventListener('pointerdown', onOutside, true);
+			search.value = '';
+			render();
+			search.focus();
+		}
+
+		function closeDrop(refocus) {
+			if (drop.hidden) {
+				return;
+			}
+			drop.hidden = true;
+			trigger.setAttribute('aria-expanded', 'false');
+			root.classList.remove('is-open');
+			document.removeEventListener('pointerdown', onOutside, true);
+			if (refocus) {
+				trigger.focus();
+			}
 		}
 
 		function setActive(index, scroll) {
@@ -4998,12 +4896,13 @@
 			}
 		}
 
-		function markSelected() {
-			rows.forEach(function (row) {
-				var on = row.entry.key === sel;
-				row.node.classList.toggle('is-selected', on);
-				row.node.setAttribute('aria-selected', on ? 'true' : 'false');
-			});
+		function select(entry) {
+			if (entry.custom) {
+				sel = CUSTOM;
+				customUrl = entry.url;
+			} else {
+				sel = entry.key;
+			}
 			updateSummary();
 			closeDrop(true);
 			if (typeof opts.onChange === 'function') {
@@ -5011,16 +4910,12 @@
 			}
 		}
 
-		function select(entry) {
-			sel = entry.key;
-			customInput.value = '';
-			markSelected();
-		}
-
 		function render() {
-			var tokens = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+			pendingRender = false;
+			var query = search.value.trim();
+			var tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
 			var matched = entries.filter(function (entry) {
-				var hay = (entry.title + ' ' + entry.path + ' ' + entry.type + ' ' + entry.parent + ' ' + entry.group).toLowerCase();
+				var hay = (entry.title + ' ' + entry.path + ' ' + entry.type + ' ' + entry.parent).toLowerCase();
 				return tokens.every(function (token) {
 					return hay.indexOf(token) !== -1;
 				});
@@ -5031,6 +4926,38 @@
 			activeIndex = -1;
 			search.removeAttribute('aria-activedescendant');
 
+			function addRow(entry) {
+				var current = entry.custom ? (sel === CUSTOM && customUrl === entry.url) : entry.key === sel;
+				var node = element('div', {
+					className: 'sfp__row' + (current ? ' is-selected' : ''),
+					role: 'option',
+					id: uid + '-o' + rows.length,
+					'aria-selected': current ? 'true' : 'false'
+				});
+				node.appendChild(element('span', { className: 'sfp__title', text: entry.title }));
+				var detail = (entry.parent ? entry.parent + '  ' : '') + entry.path;
+				if (detail) {
+					node.appendChild(element('span', { className: 'sfp__path', text: detail }));
+				}
+				if (entry.type) {
+					node.appendChild(element('span', { className: 'sfp__chip', text: pickerTypeLabel(entry.type) }));
+				}
+				node.addEventListener('mousedown', function (event) {
+					event.preventDefault();
+				});
+				node.addEventListener('click', function () {
+					select(entry);
+				});
+				rows.push({ entry: entry, node: node });
+				list.appendChild(node);
+			}
+
+			if (pickerLooksLikeUrl(query)) {
+				var url = /^https?:\/\//i.test(query) ? query : 'https://' + query;
+				list.appendChild(element('div', { className: 'sfp__group', role: 'presentation', text: tr('pickCustom', 'Custom URL') }));
+				addRow({ custom: true, url: url, title: tr('pickUseUrl', 'Use this URL'), path: url, type: '', parent: '' });
+			}
+
 			var shown = matched.slice(0, MAX_ROWS);
 			groupOrder.forEach(function (group) {
 				var inGroup = shown.filter(function (entry) {
@@ -5039,78 +4966,44 @@
 				if (!inGroup.length) {
 					return;
 				}
-				list.appendChild(element('div', { className: 'stillframe-picker__group', role: 'presentation', text: group }));
-				inGroup.forEach(function (entry) {
-					var node = element('div', {
-						className: 'stillframe-picker__row' + (entry.key === sel ? ' is-selected' : ''),
-						role: 'option',
-						id: uid + '-o' + rows.length,
-						'aria-selected': entry.key === sel ? 'true' : 'false'
-					});
-					var head = element('span', { className: 'stillframe-picker__head' });
-					head.appendChild(element('span', { className: 'stillframe-picker__title', text: entry.title }));
-					if (entry.type) {
-						head.appendChild(element('span', { className: 'stillframe-picker__chip', text: pickerTypeLabel(entry.type) }));
-					}
-					node.appendChild(head);
-					node.appendChild(element('span', {
-						className: 'stillframe-picker__path',
-						text: (entry.parent ? entry.parent + '  ' : '') + entry.path
-					}));
-					node.addEventListener('mousedown', function (event) {
-						event.preventDefault();
-					});
-					node.addEventListener('click', function () {
-						select(entry);
-					});
-					rows.push({ entry: entry, node: node });
-					list.appendChild(node);
-				});
+				list.appendChild(element('div', { className: 'sfp__group', role: 'presentation', text: group }));
+				inGroup.forEach(addRow);
 			});
 
-			if (!matched.length) {
-				list.appendChild(element('div', { className: 'stillframe-picker__note', text: tr('pickNoMatch', 'No matching pages. Use the Custom URL field.') }));
+			if (!rows.length) {
+				list.appendChild(element('div', { className: 'sfp__note', text: tr('pickNoMatch', 'No matching pages. Paste a full URL to use it.') }));
 			} else if (matched.length > MAX_ROWS) {
 				list.appendChild(element('div', {
-					className: 'stillframe-picker__note',
+					className: 'sfp__note',
 					text: tr('pickShowing', 'Showing %1$d of %2$d. Keep typing to narrow the list.').replace('%1$d', String(MAX_ROWS)).replace('%2$d', String(matched.length))
 				}));
 			}
 
-			if (tokens.length && rows.length) {
+			if (query && rows.length) {
 				setActive(0, false);
 			}
 		}
 
-		function commitCustom() {
-			if (!customInput.value.trim()) {
-				customInput.focus();
-				return;
-			}
-			sel = CUSTOM;
-			markSelected();
-		}
-
-		useButton.addEventListener('click', commitCustom);
-		customInput.addEventListener('input', function () {
-			if (customInput.value.trim()) {
-				commitCustom();
+		trigger.addEventListener('click', function () {
+			if (drop.hidden) {
+				openDrop();
+			} else {
+				closeDrop(false);
 			}
 		});
-		customInput.addEventListener('keydown', function (event) {
-			if (event.key === 'Enter') {
+		trigger.addEventListener('keydown', function (event) {
+			if (event.key === 'Escape' && typeof opts.onEscape === 'function') {
 				event.preventDefault();
 				event.stopPropagation();
-				commitCustom();
-			} else if (event.key === 'Escape') {
+				opts.onEscape();
+			} else if (event.key === 'ArrowDown' && drop.hidden) {
 				event.preventDefault();
-				event.stopPropagation();
-				closeDrop(true);
+				openDrop();
 			}
 		});
-
 		search.addEventListener('input', function () {
 			window.clearTimeout(searchTimer);
+			pendingRender = true;
 			searchTimer = window.setTimeout(render, 80);
 		});
 		search.addEventListener('keydown', function (event) {
@@ -5131,45 +5024,29 @@
 			} else if (key === 'Enter') {
 				event.preventDefault();
 				event.stopPropagation();
+				if (pendingRender) {
+					window.clearTimeout(searchTimer);
+					render();
+				}
 				if (activeIndex > -1 && rows[activeIndex]) {
 					select(rows[activeIndex].entry);
 				}
 			} else if (key === 'Escape') {
 				event.preventDefault();
 				event.stopPropagation();
-				if (search.value) {
-					search.value = '';
-					window.clearTimeout(searchTimer);
-					render();
-				} else {
-					closeDrop(true);
-				}
-			}
-		});
-		trigger.addEventListener('keydown', function (event) {
-			if (event.key === 'Escape' && typeof opts.onEscape === 'function') {
-				event.preventDefault();
-				event.stopPropagation();
-				opts.onEscape();
-			} else if (event.key === 'ArrowDown' && drop.hidden) {
-				event.preventDefault();
-				openDrop();
+				closeDrop(true);
 			}
 		});
 
-		render();
 		updateSummary();
 
 		return {
 			root: root,
 			getValue: function () {
-				if (sel === CUSTOM) {
-					return customInput.value.trim();
-				}
-				return sel;
+				return sel === CUSTOM ? customUrl : sel;
 			},
 			focusCustom: function () {
-				customInput.focus();
+				openDrop();
 			},
 			isCustom: function () {
 				return sel === CUSTOM;
