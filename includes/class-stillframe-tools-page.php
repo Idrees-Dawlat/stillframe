@@ -180,6 +180,16 @@ class Stillframe_Tools_Page {
 								</div>
 							</div>
 
+							<!-- Capture engine -->
+							<div class="stillframe-setting-col">
+								<span class="stillframe-sublabel"><?php esc_html_e( 'Screen capture', 'stillframe' ); ?></span>
+								<label class="stillframe-switch-wrap">
+									<input type="checkbox" id="stillframe-exact-engine" checked class="stillframe-switch-input" />
+									<span class="stillframe-switch-slider"></span>
+									<span class="stillframe-switch-label"><?php esc_html_e( 'Pixel-perfect (browser asks to share the tab)', 'stillframe' ); ?></span>
+								</label>
+							</div>
+
 							<!-- Clean Presentation (Toggle Switch) -->
 							<div class="stillframe-setting-col">
 								<span class="stillframe-sublabel"><?php esc_html_e( 'Clean Presentation', 'stillframe' ); ?></span>

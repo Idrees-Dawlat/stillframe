@@ -2827,3 +2827,104 @@ body.stillframe-locked {
 .stillframe-result .stillframe-btn.stillframe-btn-primary .stillframe-btn__label {
 	display: inline !important;
 }
+
+/* ---- Direct Page tweaks ---- */
+.stillframe-snip .stillframe-snip__direct-menu {
+	width: 420px;
+	gap: 12px;
+}
+
+.stillframe-snip .sfd-chip {
+	height: 32px;
+}
+
+.stillframe-snip .sfd-chip svg {
+	width: 17px;
+	height: 17px;
+}
+
+.sfd-error {
+	margin: -6px 0 0;
+	padding-left: 72px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #b42318;
+}
+
+.sfd-error:empty {
+	display: none;
+}
+
+.stillframe-snip .sfd-row + .stillframe-hub-toggle,
+.stillframe-snip .stillframe-snip__direct-menu > .stillframe-hub-toggle {
+	margin: 6px 0 4px;
+}
+
+/* Page list opens across the full width of the menu and nothing in it is sticky */
+.sfd-row .sfp .sfp__drop {
+	left: -72px;
+}
+
+.sfp .sfp__search {
+	height: 26px;
+	margin-bottom: 4px;
+	font-size: 12px;
+}
+
+.sfp .sfp__group {
+	position: static;
+}
+
+.sfp .sfp__list {
+	max-height: 260px;
+}
+
+/* ---- Recent cards: quiet hover, smaller buttons ---- */
+.stillframe-snip .stillframe-recent-card:hover,
+.stillframe-result .stillframe-recent-card:hover {
+	background: #ffffff;
+	border-color: var(--sf-line-strong, #d1d5db);
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.stillframe-snip .stillframe-recent-actions,
+.stillframe-result .stillframe-recent-actions {
+	flex-wrap: nowrap;
+	gap: 6px;
+}
+
+.stillframe-snip .stillframe-recent-btn,
+.stillframe-result .stillframe-recent-btn {
+	height: 26px !important;
+	gap: 5px !important;
+	padding: 0 9px !important;
+	font-size: 12px !important;
+	font-weight: 600 !important;
+	border-radius: 6px !important;
+}
+
+.stillframe-snip .stillframe-recent-btn svg,
+.stillframe-result .stillframe-recent-btn svg {
+	width: 13px;
+	height: 13px;
+}
+
+.stillframe-snip .stillframe-recent-btn:hover,
+.stillframe-result .stillframe-recent-btn:hover {
+	color: var(--sf-text, #111827) !important;
+	background: #f3f4f6 !important;
+	border-color: #9ca3af !important;
+}
+
+.stillframe-snip .stillframe-recent-btn.stillframe-recent-btn--del,
+.stillframe-result .stillframe-recent-btn.stillframe-recent-btn--del {
+	width: 26px !important;
+	padding: 0 !important;
+}
+
+.stillframe-snip .stillframe-recent-btn.stillframe-recent-btn--del:hover,
+.stillframe-result .stillframe-recent-btn.stillframe-recent-btn--del:hover {
+	color: #b42318 !important;
+	background: #fef2f2 !important;
+	border-color: #f1b5b0 !important;
+}

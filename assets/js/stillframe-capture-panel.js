@@ -2275,7 +2275,7 @@
 					title: 'Save to Media Library'
 				});
 				mediaBtn.appendChild(iconSvg('media', 13));
-				mediaBtn.appendChild(element('span', { text: 'Save to Media' }));
+				mediaBtn.appendChild(element('span', { text: 'Save' }));
 				mediaBtn.addEventListener('click', function (e) {
 					e.stopPropagation();
 					uploadRecentToMedia(item, mediaBtn);
@@ -3428,6 +3428,7 @@
 		];
 		var devCards = {};
 		var hubDevBox = element('div', { className: 'sfd-chips', role: 'group', 'aria-label': tr('selectDevices', 'Devices') });
+		var hubError = element('p', { className: 'sfd-error', role: 'alert' });
 
 		function selectedDevices() {
 			return availableDevices.filter(function (d) {
@@ -3440,17 +3441,14 @@
 				type: 'button',
 				className: 'sfd-chip is-selected',
 				'aria-pressed': 'true',
-				title: tr('dev_' + d.id, d.label) + ' (' + d.width + 'px)'
+				title: tr('dev_' + d.id, d.label) + ' (' + d.width + 'px)',
+				'aria-label': tr('dev_' + d.id, d.label) + ' (' + d.width + 'px)'
 			});
-			chip.appendChild(iconSvg(d.icon, 14));
-			chip.appendChild(element('span', { text: tr('dev_' + d.id, d.label) }));
-			chip.appendChild(element('em', { text: String(d.width) }));
+			chip.appendChild(iconSvg(d.icon, 17));
 			chip.addEventListener('click', function (e) {
 				stopBar(e);
+				hubError.textContent = '';
 				var on = chip.classList.contains('is-selected');
-				if (on && selectedDevices().length < 2) {
-					return;
-				}
 				chip.classList.toggle('is-selected', !on);
 				chip.setAttribute('aria-pressed', on ? 'false' : 'true');
 				updateSubmitLabel();
@@ -3533,7 +3531,9 @@
 
 		function updateSubmitLabel() {
 			var selected = selectedDevices();
-			if (selected.length === 1) {
+			if (!selected.length) {
+				hubSubmitText.textContent = tr('captureNone', 'Capture');
+			} else if (selected.length === 1) {
 				hubSubmitText.textContent = tr('captureOne', 'Capture %s').replace('%s', selected[0].label);
 			} else {
 				hubSubmitText.textContent = tr('captureN', 'Capture %d devices').replace('%d', String(selected.length));
@@ -3552,7 +3552,8 @@
 
 			var selected = selectedDevices();
 			if (!selected.length) {
-				selected = availableDevices;
+				hubError.textContent = tr('chooseDevice', 'Choose at least one device to capture.');
+				return;
 			}
 
 			var targetScale = parseInt(hubResSelected, 10) || 2;
@@ -3569,9 +3570,9 @@
 		directMenu.appendChild(directTitle);
 		directMenu.appendChild(sfdRow(tr('targetPage', 'Page'), hubPicker.root));
 		directMenu.appendChild(sfdRow(tr('selectDevices', 'Devices'), hubDevBox));
+		directMenu.appendChild(hubError);
 		directMenu.appendChild(sfdRow(tr('resQuality', 'Quality'), hubResSeg));
 		directMenu.appendChild(sfdRow(tr('captureHeight', 'Height'), hubHeightSeg));
-		directMenu.appendChild(hubHelp);
 		directMenu.appendChild(hubAdminLabel);
 		directMenu.appendChild(hubFooter);
 
@@ -3632,7 +3633,6 @@
 		bar.appendChild(rectButton);
 		bar.appendChild(windowModeButton);
 		bar.appendChild(fullButton);
-		bar.appendChild(devWrap);
 		bar.appendChild(directWrap);
 		bar.appendChild(recentWrap);
 		bar.appendChild(sep);

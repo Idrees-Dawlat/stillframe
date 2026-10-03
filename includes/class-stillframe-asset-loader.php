@@ -519,6 +519,8 @@ class Stillframe_Asset_Loader {
 			/* translators: 1: rows shown, 2: rows matched. */
 			'pickShowing'          => __( 'Showing %1$d of %2$d. Keep typing to narrow the list.', 'stillframe' ),
 			'pickChoose'           => __( 'Choose a page', 'stillframe' ),
+			'captureNone'          => __( 'Capture', 'stillframe' ),
+			'chooseDevice'         => __( 'Choose at least one device to capture.', 'stillframe' ),
 			'pickUseUrl'           => __( 'Use this URL', 'stillframe' ),
 			'engineTitle'          => __( 'Pixel-perfect capture', 'stillframe' ),
 			'engineHelp'           => __( 'Your browser asks to share this tab, so the screenshot matches the screen exactly. Nothing is uploaded.', 'stillframe' ),

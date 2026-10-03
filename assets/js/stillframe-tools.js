@@ -74,6 +74,23 @@
 
 	// The capture opens the same pop-up editor as the top-bar capture,
 	// with every chosen device ready to switch between.
+	// Pixel-perfect capture setting, read by the capture panel.
+	var engineToggle = document.getElementById('stillframe-exact-engine');
+	if (engineToggle) {
+		try {
+			engineToggle.checked = window.localStorage.getItem('stillframeEngine') !== 'compat';
+		} catch (error) {
+			engineToggle.checked = true;
+		}
+		engineToggle.addEventListener('change', function () {
+			try {
+				window.localStorage.setItem('stillframeEngine', engineToggle.checked ? 'exact' : 'compat');
+			} catch (error) {
+				return;
+			}
+		});
+	}
+
 	var errorNode = null;
 
 	function showError(message) {
