@@ -2366,3 +2366,24 @@ body.stillframe-locked {
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
+
+.stillframe-result .stillframe-format-select {
+	height: 36px;
+	margin: 0 4px 0 0;
+	padding: 0 24px 0 10px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--sf-text-2, #374151);
+	background-color: var(--sf-surface, #ffffff);
+	border: 1px solid var(--sf-line-strong, #d1d5db);
+	border-radius: 8px;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.stillframe-result .stillframe-format-select:hover,
+.stillframe-result .stillframe-format-select:focus {
+	color: var(--sf-brand, #005976);
+	border-color: var(--sf-brand, #005976);
+	outline: none;
+}

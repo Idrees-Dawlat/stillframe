@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Accepts one PNG from an administrator and stores it as an attachment.
+ * Accepts one PNG, JPEG or WebP image from an administrator and stores it as an attachment.
  */
 class Stillframe_Media {
 
@@ -24,7 +24,7 @@ class Stillframe_Media {
 	}
 
 	/**
-	 * Store the uploaded PNG and return its attachment URL.
+	 * Store the uploaded image and return its attachment URL.
 	 *
 	 * @return void
 	 */
@@ -65,7 +65,7 @@ class Stillframe_Media {
 			$this->fail();
 		}
 
-		$name = $this->png_filename( wp_unslash( $file['name'] ) );
+		$name = $this->image_filename( wp_unslash( $file['name'] ) );
 
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
@@ -75,11 +75,13 @@ class Stillframe_Media {
 			$tmp_name,
 			$name,
 			array(
-				'png' => 'image/png',
+				'png'      => 'image/png',
+				'jpg|jpeg' => 'image/jpeg',
+				'webp'     => 'image/webp',
 			)
 		);
 
-		if ( empty( $checked['ext'] ) || 'png' !== $checked['ext'] || 'image/png' !== $checked['type'] ) {
+		if ( empty( $checked['ext'] ) || empty( $checked['type'] ) || ! in_array( $checked['type'], array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ) {
 			$this->fail();
 		}
 
@@ -90,7 +92,9 @@ class Stillframe_Media {
 			array(
 				'test_form' => false,
 				'mimes'     => array(
-					'png' => 'image/png',
+					'png'      => 'image/png',
+					'jpg|jpeg' => 'image/jpeg',
+					'webp'     => 'image/webp',
 				),
 			)
 		);
@@ -103,7 +107,7 @@ class Stillframe_Media {
 
 		$attachment_id = wp_insert_attachment(
 			array(
-				'post_mime_type' => 'image/png',
+				'post_mime_type' => $checked['type'],
 				'post_title'     => sanitize_text_field( pathinfo( $name, PATHINFO_FILENAME ) ),
 				'post_content'   => '',
 				'post_status'    => 'inherit',
@@ -140,16 +144,16 @@ class Stillframe_Media {
 	}
 
 	/**
-	 * Keep a safe PNG filename, or fall back to a generated one.
+	 * Keep a safe image filename, or fall back to a generated one.
 	 *
 	 * @param mixed $raw Original upload name.
 	 * @return string
 	 */
-	private function png_filename( $raw ) {
+	private function image_filename( $raw ) {
 		$name = is_string( $raw ) ? sanitize_file_name( $raw ) : '';
 		$name = strtolower( $name );
 
-		if ( ! preg_match( '/^[a-z0-9][a-z0-9._-]*\.png$/', $name ) ) {
+		if ( ! preg_match( '/^[a-z0-9][a-z0-9._-]*\.(png|jpe?g|webp)$/', $name ) ) {
 			$name = 'stillframe-' . gmdate( 'Ymd-His' ) . '.png';
 		}
 

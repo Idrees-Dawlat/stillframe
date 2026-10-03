@@ -54,6 +54,9 @@
 	var IDLE_BEFORE_RENDER_MS = 1500;
 
 	function canPrerender() {
+		if (exactEnabled()) {
+			return false;
+		}
 		if (viewShot.slow) {
 			return false;
 		}
@@ -272,14 +275,164 @@
 
 	function viewScale() {
 		var ratio = window.devicePixelRatio || 1;
-		return ratio >= 1.5 ? 2 : 1;
+		return Math.min(3, Math.max(2, Math.round(ratio)));
+	}
+
+	// Browsers cap canvas size (about 16k px per side, 268M px total). Step the scale down to fit.
+	function safeScale(width, height, scale) {
+		var next = scale;
+		while (next > 1 && (width * next > 16384 || height * next > 16384 || width * next * height * next > 120000000)) {
+			next -= 1;
+		}
+		return next;
+	}
+
+	// Exact engine: a real screenshot of this tab through the browser's own capture.
+	var EXACT_KEY = 'stillframeEngine';
+	var exact = { stream: null, video: null, timer: 0, failed: false };
+
+	function exactPref() {
+		try {
+			return window.localStorage.getItem(EXACT_KEY) !== 'compat';
+		} catch (error) {
+			return true;
+		}
+	}
+
+	function setExactPref(on) {
+		try {
+			window.localStorage.setItem(EXACT_KEY, on ? 'exact' : 'compat');
+		} catch (error) {
+			// Storage can be blocked; the choice then lasts for this page only.
+		}
+		exact.failed = false;
+	}
+
+	function exactEnabled() {
+		if (exact.failed || !exactPref()) {
+			return false;
+		}
+		return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && /Chrome\//.test(navigator.userAgent));
+	}
+
+	function stopExact() {
+		window.clearTimeout(exact.timer);
+		if (exact.stream) {
+			exact.stream.getTracks().forEach(function (track) {
+				track.stop();
+			});
+		}
+		if (exact.video) {
+			exact.video.srcObject = null;
+			if (exact.video.parentNode) {
+				exact.video.parentNode.removeChild(exact.video);
+			}
+		}
+		exact.stream = null;
+		exact.video = null;
+	}
+
+	// Keep the share open briefly so a second capture does not ask again.
+	function keepExactAlive() {
+		window.clearTimeout(exact.timer);
+		exact.timer = window.setTimeout(stopExact, 45000);
+	}
+
+	function getExactVideo() {
+		if (exact.stream && exact.video && exact.stream.active) {
+			return Promise.resolve(exact.video);
+		}
+		stopExact();
+		return navigator.mediaDevices.getDisplayMedia({
+			video: { displaySurface: 'browser' },
+			audio: false,
+			preferCurrentTab: true,
+			selfBrowserSurface: 'include',
+			surfaceSwitching: 'exclude'
+		}).then(function (stream) {
+			var track = stream.getVideoTracks()[0];
+			var settings = track && track.getSettings ? track.getSettings() : {};
+			if (!track || (settings.displaySurface && settings.displaySurface !== 'browser')) {
+				stream.getTracks().forEach(function (item) {
+					item.stop();
+				});
+				throw new Error('surface');
+			}
+			track.addEventListener('ended', stopExact);
+			var video = document.createElement('video');
+			video.muted = true;
+			video.playsInline = true;
+			video.srcObject = stream;
+			video.style.cssText = 'position:fixed;left:-99999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+			document.body.appendChild(video);
+			exact.stream = stream;
+			exact.video = video;
+			return video.play().then(function () {
+				return new Promise(function (resolve) {
+					if (video.videoWidth) {
+						resolve();
+						return;
+					}
+					video.addEventListener('loadedmetadata', function () {
+						resolve();
+					});
+				});
+			}).then(function () {
+				return video;
+			});
+		});
+	}
+
+	function nextVideoFrame(video) {
+		return new Promise(function (resolve) {
+			var done = false;
+			function finish() {
+				if (!done) {
+					done = true;
+					resolve();
+				}
+			}
+			if (video.requestVideoFrameCallback) {
+				video.requestVideoFrameCallback(finish);
+			}
+			window.setTimeout(finish, 400);
+		});
+	}
+
+	// Hide Stillframe's own UI, grab one frame, and crop the selection from it.
+	function grabExact(rect, hideEl) {
+		return getExactVideo().then(function (video) {
+			if (hideEl) {
+				hideEl.style.visibility = 'hidden';
+			}
+			return nextFrames(2).then(function () {
+				return new Promise(function (resolve) {
+					window.setTimeout(resolve, 120);
+				});
+			}).then(function () {
+				return nextVideoFrame(video);
+			}).then(function () {
+				var ratio = video.videoWidth / Math.max(1, window.innerWidth);
+				var expected = window.innerHeight / Math.max(1, window.innerWidth);
+				if (!video.videoWidth || Math.abs(video.videoHeight / video.videoWidth - expected) > 0.03) {
+					throw new Error('mismatch');
+				}
+				var full = document.createElement('canvas');
+				full.width = video.videoWidth;
+				full.height = video.videoHeight;
+				full.getContext('2d').drawImage(video, 0, 0);
+				return canvasToBlob(cropCanvasSync(full, rect, ratio)).then(function (blob) {
+					return { blob: blob, scale: Math.round(ratio * 100) / 100 };
+				});
+			});
+		});
 	}
 
 	function startViewShot() {
 		var id = ++viewShot.id;
 		viewShot.canvas = null;
 		var size = viewSize();
-		var scale = viewScale();
+		var scale = safeScale(size.width, size.height, viewScale());
 		viewShot.scale = scale;
 		var startedAt = Date.now();
 		viewShot.work = waitForReady(document).then(function () {
@@ -493,7 +646,68 @@
 		image.src = objectUrl;
 	}
 
+	var EXPORT_KEY = 'stillframeExportFormat';
+
+	function exportFormat() {
+		try {
+			var saved = window.localStorage.getItem(EXPORT_KEY);
+			if (saved === 'jpeg' || saved === 'webp') {
+				return saved;
+			}
+		} catch (error) {
+			return 'png';
+		}
+		return 'png';
+	}
+
+	// Convert a PNG blob to the chosen export format. PNG passes through untouched.
+	function exportAs(blob, name) {
+		var format = exportFormat();
+		if (format === 'png') {
+			return Promise.resolve({ blob: blob, name: name });
+		}
+		var mime = format === 'jpeg' ? 'image/jpeg' : 'image/webp';
+		var extension = format === 'jpeg' ? 'jpg' : 'webp';
+		return new Promise(function (resolve) {
+			var url = URL.createObjectURL(blob);
+			var img = new Image();
+			img.onload = function () {
+				try {
+					var canvas = document.createElement('canvas');
+					canvas.width = img.naturalWidth;
+					canvas.height = img.naturalHeight;
+					var ctx = canvas.getContext('2d');
+					ctx.fillStyle = '#ffffff';
+					ctx.fillRect(0, 0, canvas.width, canvas.height);
+					ctx.drawImage(img, 0, 0);
+					canvas.toBlob(function (out) {
+						URL.revokeObjectURL(url);
+						if (out && out.type === mime) {
+							resolve({ blob: out, name: name.replace(/\.png$/, '.' + extension) });
+						} else {
+							resolve({ blob: blob, name: name });
+						}
+					}, mime, 0.9);
+				} catch (error) {
+					URL.revokeObjectURL(url);
+					resolve({ blob: blob, name: name });
+				}
+			};
+			img.onerror = function () {
+				URL.revokeObjectURL(url);
+				resolve({ blob: blob, name: name });
+			};
+			img.src = url;
+		});
+	}
+
 	function saveBlob(blob, name) {
+		exportAs(blob, name).then(function (out) {
+			writeBlob(out.blob, out.name);
+		});
+	}
+
+	function writeBlob(blob, name) {
 		var url = URL.createObjectURL(blob);
 		var link = element('a', {
 			href: url,
@@ -1220,6 +1434,23 @@
 		};
 	}
 
+	// Use the page's own background colour behind transparent areas; white when it has none.
+	function pageBackground(view) {
+		try {
+			var doc = view.document;
+			var nodes = [doc.body, doc.documentElement];
+			for (var i = 0; i < nodes.length; i++) {
+				var color = nodes[i] ? view.getComputedStyle(nodes[i]).backgroundColor : '';
+				if (color && color !== 'transparent' && !/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(color)) {
+					return color;
+				}
+			}
+		} catch (error) {
+			return '#ffffff';
+		}
+		return '#ffffff';
+	}
+
 	function renderCanvas(node, scale, bounds, view) {
 		view = view || window;
 		if (!window.modernScreenshot || typeof window.modernScreenshot.domToCanvas !== 'function') {
@@ -1232,9 +1463,9 @@
 		try {
 			var options = {
 				scale: scale,
-				backgroundColor: '#ffffff',
+				backgroundColor: pageBackground(view),
 				maximumCanvasSize: 0,
-				timeout: 4000,
+				timeout: 15000,
 				features: {
 					restoreScrollPosition: false,
 					copyScrollbar: false,
@@ -1278,6 +1509,62 @@
 		});
 	}
 
+	// Load lazy images and wait for fonts and images before the shot.
+	function warmFrame(local) {
+		var win = local.contentWindow;
+		var doc = local.contentDocument;
+		var wait = function (ms) {
+			return new Promise(function (resolve) {
+				window.setTimeout(resolve, ms);
+			});
+		};
+		try {
+			Array.prototype.forEach.call(doc.querySelectorAll('img[loading="lazy"]'), function (img) {
+				img.setAttribute('loading', 'eager');
+			});
+			Array.prototype.forEach.call(doc.querySelectorAll('img[data-src], img[data-lazy-src], img[data-srcset]'), function (img) {
+				var src = img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+				var current = img.getAttribute('src') || '';
+				if (src && (!current || /^data:/.test(current))) {
+					img.setAttribute('src', src);
+				}
+				var srcset = img.getAttribute('data-srcset');
+				if (srcset) {
+					img.setAttribute('srcset', srcset);
+				}
+			});
+		} catch (error) {
+			return Promise.resolve();
+		}
+		var total = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+		var step = Math.max(300, win.innerHeight || 800);
+		var chain = Promise.resolve();
+		for (var y = step; y < total && y < step * 40; y += step) {
+			(function (top) {
+				chain = chain.then(function () {
+					win.scrollTo(0, top);
+					return wait(120);
+				});
+			})(y);
+		}
+		return chain.then(function () {
+			win.scrollTo(0, 0);
+			var fonts = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
+			var images = Array.prototype.map.call(doc.images || [], function (img) {
+				if (img.complete) {
+					return Promise.resolve();
+				}
+				return new Promise(function (resolve) {
+					img.addEventListener('load', resolve);
+					img.addEventListener('error', resolve);
+				});
+			});
+			return Promise.race([Promise.all([fonts].concat(images)), wait(6000)]);
+		}).catch(function () {
+			return null;
+		});
+	}
+
 	function prepareAndShoot(local, scale, options) {
 		options = options || {};
 		var restore = function () {};
@@ -1289,6 +1576,8 @@
 		}
 
 		return waitForReady(local.contentDocument).then(function () {
+			return canReadFrame(local) ? warmFrame(local) : null;
+		}).then(function () {
 			if (!canReadFrame(local)) {
 				var blocked = new Error('blocked');
 				blocked.code = 'blocked';
@@ -1326,7 +1615,11 @@
 			var doc = local.contentDocument;
 			var frameWidth = parseInt(local.style.width, 10) || local.clientWidth || 1;
 			var frameHeight = parseInt(local.style.height, 10) || measureHeight(doc);
-			return shoot(doc.documentElement, scale, {
+			var fitScale = safeScale(frameWidth, frameHeight, scale);
+			if (fitScale < scale) {
+				setStatus('Scaled to ' + fitScale + 'x to fit browser limits.', '', '', 'busy');
+			}
+			return shoot(doc.documentElement, fitScale, {
 				width: frameWidth,
 				height: frameHeight,
 				fullPage: options.fullPage !== false
@@ -1356,11 +1649,42 @@
 			return;
 		}
 		var token = session;
-		var work = getViewCanvas().then(function (canvas) {
-			return cropCanvasToBlob(canvas, rect, viewShot.scale);
-		});
-		openResult(rect, work, token);
-		destroySnip();
+
+		function compatCapture() {
+			var work = getViewCanvas().then(function (canvas) {
+				return cropCanvasToBlob(canvas, rect, viewShot.scale);
+			});
+			openResult(rect, work, token);
+			destroySnip();
+		}
+
+		if (exactEnabled()) {
+			var hideEl = snip;
+			snipBusy = true;
+			grabExact(rect, hideEl).then(function (result) {
+				if (token !== session) {
+					return;
+				}
+				rect.scale = result.scale;
+				keepExactAlive();
+				openResult(rect, Promise.resolve(result.blob), token);
+				destroySnip();
+			}).catch(function () {
+				if (hideEl) {
+					hideEl.style.visibility = '';
+				}
+				snipBusy = false;
+				if (token !== session) {
+					return;
+				}
+				// Denied or unsupported: use the compatible DOM render for the rest of this page view.
+				exact.failed = true;
+				stopExact();
+				compatCapture();
+			});
+			return;
+		}
+		compatCapture();
 	}
 
 	function exportBlob() {
@@ -1641,8 +1965,89 @@
 	var SIZES = [2.5, 4, 7];
 
 	var RECENT_KEY = 'stillframe_recent_captures_v1';
-	var RECENT_MAX = 10;
+	var RECENT_MAX = 20;
+	var RECENT_BYTES = 200 * 1024 * 1024;
 	var recentBlobs = {};
+
+	// Full-size originals live in IndexedDB; localStorage keeps only small thumbnails.
+	function idbRun(mode, work) {
+		return new Promise(function (resolve, reject) {
+			if (!window.indexedDB) {
+				reject(new Error('idb'));
+				return;
+			}
+			var open = window.indexedDB.open('stillframe', 1);
+			open.onupgradeneeded = function () {
+				open.result.createObjectStore('recent', { keyPath: 'id' });
+			};
+			open.onerror = function () {
+				reject(open.error);
+			};
+			open.onsuccess = function () {
+				var db = open.result;
+				var tx = db.transaction('recent', mode);
+				var request = work(tx.objectStore('recent'));
+				tx.oncomplete = function () {
+					db.close();
+					resolve(request ? request.result : undefined);
+				};
+				tx.onerror = function () {
+					db.close();
+					reject(tx.error);
+				};
+			};
+		});
+	}
+
+	function recentGetBlob(id) {
+		if (recentBlobs[id]) {
+			return Promise.resolve(recentBlobs[id]);
+		}
+		return idbRun('readonly', function (store) {
+			return store.get(id);
+		}).then(function (row) {
+			return row && row.blob ? row.blob : null;
+		}).catch(function () {
+			return null;
+		});
+	}
+
+	// Drop originals that are no longer in the list, and the oldest ones past the size cap.
+	function recentPrune(list) {
+		return idbRun('readwrite', function (store) {
+			var all = store.getAll();
+			all.onsuccess = function () {
+				var byId = {};
+				(all.result || []).forEach(function (row) {
+					byId[row.id] = row;
+				});
+				var total = 0;
+				var keep = {};
+				list.forEach(function (item) {
+					var row = byId[item.id];
+					if (row && total + (row.size || 0) <= RECENT_BYTES) {
+						total += row.size || 0;
+						keep[item.id] = true;
+					}
+				});
+				Object.keys(byId).forEach(function (id) {
+					if (!keep[id]) {
+						store.delete(id);
+					}
+				});
+			};
+			return all;
+		}).catch(function () {
+			return null;
+		});
+	}
+
+	function formatBytes(bytes) {
+		if (bytes >= 1048576) {
+			return (bytes / 1048576).toFixed(1) + ' MB';
+		}
+		return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+	}
 
 	function getRecentCaptures() {
 		try {
@@ -1673,6 +2078,11 @@
 			window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
 			delete recentBlobs[id];
 		} catch (e) {}
+		idbRun('readwrite', function (store) {
+			return store.delete(id);
+		}).catch(function () {
+			return null;
+		});
 	}
 
 	function formatRecentTime(ts) {
@@ -1690,19 +2100,24 @@
 		if (!blob || !width || !height) return;
 		var id = 'sf_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
 		recentBlobs[id] = blob;
+		idbRun('readwrite', function (store) {
+			return store.put({ id: id, blob: blob, size: blob.size, timestamp: Date.now() });
+		}).catch(function () {
+			return null;
+		});
 
 		var img = new Image();
 		var objUrl = URL.createObjectURL(blob);
 		img.onload = function () {
 			try {
-				var maxW = 360;
+				var maxW = 480;
 				var r = Math.min(1, maxW / (img.naturalWidth || width));
 				var thumbCanvas = document.createElement('canvas');
 				thumbCanvas.width = Math.max(1, Math.round((img.naturalWidth || width) * r));
 				thumbCanvas.height = Math.max(1, Math.round((img.naturalHeight || height) * r));
 				var ctx = thumbCanvas.getContext('2d');
 				ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
-				var thumbData = thumbCanvas.toDataURL('image/jpeg', 0.72);
+				var thumbData = thumbCanvas.toDataURL('image/jpeg', 0.85);
 
 				var cleanTitle = title || '';
 				if (!cleanTitle || cleanTitle.indexOf('http') === 0) {
@@ -1721,6 +2136,8 @@
 					width: width,
 					height: height,
 					timestamp: Date.now(),
+					size: blob.size,
+					pixelWidth: img.naturalWidth || width,
 					thumb: thumbData
 				};
 
@@ -1728,6 +2145,7 @@
 				list.unshift(item);
 				if (list.length > RECENT_MAX) list = list.slice(0, RECENT_MAX);
 				saveRecentList(list);
+				recentPrune(list);
 			} catch (err) {
 				console.warn('Stillframe recent save error', err);
 			} finally {
@@ -1750,22 +2168,22 @@
 			scale: 1,
 			url: item.url || window.location.href
 		};
-		var work;
-		if (recentBlobs[item.id]) {
-			work = Promise.resolve(recentBlobs[item.id]);
-		} else if (item.thumb) {
-			work = window.fetch(item.thumb).then(function (r) { return r.blob(); });
-		} else {
-			return;
-		}
-		openResult(rect, work, token);
+		recentGetBlob(item.id).then(function (blob) {
+			if (!blob || token !== session) {
+				return;
+			}
+			openResult(rect, Promise.resolve(blob), token);
+		});
 	}
 
 	function uploadRecentToMedia(item, btn) {
 		if (!config.canUpload || !config.ajaxUrl || !config.mediaNonce) return;
-		var getBlobPromise = recentBlobs[item.id]
-			? Promise.resolve(recentBlobs[item.id])
-			: window.fetch(item.thumb).then(function (r) { return r.blob(); });
+		var getBlobPromise = recentGetBlob(item.id).then(function (blob) {
+			if (!blob) {
+				throw new Error('missing');
+			}
+			return blob;
+		});
 
 		if (btn) btn.disabled = true;
 		getBlobPromise.then(function (blob) {
@@ -1825,6 +2243,9 @@
 			if (item.width && item.height) {
 				meta.appendChild(element('span', { className: 'stillframe-recent-chip', text: item.width + ' × ' + item.height }));
 			}
+			if (item.size) {
+				meta.appendChild(element('span', { className: 'stillframe-recent-chip', text: formatBytes(item.size) }));
+			}
 			meta.appendChild(element('span', { text: formatRecentTime(item.timestamp) }));
 			info.appendChild(meta);
 
@@ -1873,6 +2294,17 @@
 
 			info.appendChild(actions);
 			card.appendChild(info);
+
+			recentGetBlob(item.id).then(function (blob) {
+				if (blob) {
+					return;
+				}
+				editBtn.disabled = true;
+				if (typeof mediaBtn !== 'undefined' && mediaBtn) {
+					mediaBtn.disabled = true;
+				}
+				meta.appendChild(element('span', { text: 'Original no longer stored' }));
+			});
 
 			card.addEventListener('click', function () {
 				if (onSelect) onSelect(item);
@@ -2062,7 +2494,20 @@
 		closeButton.addEventListener('click', function () {
 			api.closePanel();
 		});
+		var formatSelect = element('select', { className: 'stillframe-format-select', 'aria-label': 'Export format', title: 'Export format' });
+		[['png', 'PNG'], ['jpeg', 'JPEG'], ['webp', 'WebP']].forEach(function (opt) {
+			formatSelect.appendChild(element('option', { value: opt[0], text: opt[1] }));
+		});
+		formatSelect.value = exportFormat();
+		formatSelect.addEventListener('change', function () {
+			try {
+				window.localStorage.setItem(EXPORT_KEY, formatSelect.value);
+			} catch (error) {
+				return;
+			}
+		});
 		saveGroup.appendChild(recentDrawerButton);
+		saveGroup.appendChild(formatSelect);
 		saveGroup.appendChild(mediaButton);
 		saveGroup.appendChild(downloadButton);
 		saveGroup.appendChild(closeButton);
@@ -2331,10 +2776,18 @@
 
 			Promise.all(flattenPromises).then(function (items) {
 				return Promise.all(items.map(function (item) {
+					return exportAs(item.blob, fileNameFor(item.dev.url, item.dev.width, item.dev.scale || 1)).then(function (out) {
+						item.blob = out.blob;
+						item.fname = out.name;
+						return item;
+					});
+				}));
+			}).then(function (items) {
+				return Promise.all(items.map(function (item) {
 					var body = new FormData();
 					body.append('action', 'stillframe_save_media');
 					body.append('nonce', String(config.mediaNonce));
-					var fname = fileNameFor(item.dev.url, item.dev.width, item.dev.scale || 1);
+					var fname = item.fname;
 					body.append('image', item.blob, fname);
 					return window.fetch(String(config.ajaxUrl), {
 						method: 'POST',
@@ -2881,6 +3334,17 @@
 
 		devMenu.appendChild(sec1Title);
 		devMenu.appendChild(sec1Grid);
+
+		var engineLabel = element('label', { className: 'stillframe-hub-toggle', title: 'Takes a real screenshot of this tab. Your browser asks to share the tab. Nothing is uploaded.' });
+		var engineCb = element('input', { type: 'checkbox', className: 'stillframe-hub-toggle__input' });
+		engineCb.checked = exactPref();
+		engineCb.addEventListener('change', function () {
+			setExactPref(engineCb.checked);
+		});
+		engineLabel.appendChild(engineCb);
+		engineLabel.appendChild(element('span', { className: 'stillframe-hub-toggle__track' }));
+		engineLabel.appendChild(element('span', { text: 'Exact capture (browser asks to share this tab)' }));
+		devMenu.appendChild(engineLabel);
 
 		function toggleMenu(menu, button, onOpen) {
 			var wasOpen = !menu.hidden;
@@ -3630,12 +4094,12 @@
 			});
 			local.tabIndex = -1;
 			local.style.position = 'fixed';
-			local.style.left = '0';
+			local.style.left = '-99999px';
 			local.style.top = '0';
 			local.style.width = width + 'px';
 			local.style.height = '100vh';
 			local.style.border = '0';
-			local.style.opacity = '0';
+			local.style.opacity = '1';
 			local.style.pointerEvents = 'none';
 			local.style.zIndex = '0';
 			frame = local;
@@ -3894,11 +4358,14 @@
 			mediaButton.disabled = true;
 		}
 		setStatus(text('savingMedia'), '', '', 'busy');
-		exportBlob().then(function (blob) {
+		exportBlob().then(function (pngBlob) {
+			return exportAs(pngBlob, fileNameFor(captured.url, captured.width, captured.scale));
+		}).then(function (out) {
+			var blob = out.blob;
 			var body = new FormData();
 			body.append('action', 'stillframe_save_media');
 			body.append('nonce', String(config.mediaNonce));
-			body.append('image', blob, fileNameFor(captured.url, captured.width, captured.scale));
+			body.append('image', blob, out.name);
 			return window.fetch(String(config.ajaxUrl), {
 				method: 'POST',
 				credentials: 'same-origin',
