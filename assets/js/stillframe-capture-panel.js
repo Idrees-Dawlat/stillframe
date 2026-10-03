@@ -3279,6 +3279,10 @@
 				recentMenu.hidden = true;
 				recentButton.setAttribute('aria-expanded', 'false');
 			}
+			if (root.classList.contains('has-menu-open') && fullButton.getAttribute('aria-pressed') !== 'true') {
+				rectButton.setAttribute('aria-pressed', mode === 'rect' ? 'true' : 'false');
+				windowModeButton.setAttribute('aria-pressed', mode === 'window' ? 'true' : 'false');
+			}
 			root.classList.remove('has-menu-open');
 			if (!sel) {
 				hint.hidden = false;
@@ -3371,6 +3375,8 @@
 				}
 				menu.hidden = false;
 				button.setAttribute('aria-expanded', 'true');
+				rectButton.setAttribute('aria-pressed', 'false');
+				windowModeButton.setAttribute('aria-pressed', 'false');
 				root.classList.add('has-menu-open');
 				hint.hidden = true;
 				hint.style.display = 'none';

@@ -152,11 +152,28 @@
 		return styleControls(group);
 	}
 
-	function makeText(x, y, color, fontSize, width) {
+	var measureCtx = document.createElement('canvas').getContext('2d');
+
+	/* A new text box hugs what is typed until the user drags a side handle to set a width. */
+	function fitTextWidth(t) {
+		if (t.sfManual || !measureCtx) {
+			return;
+		}
+		measureCtx.font = '700 ' + t.fontSize + 'px ' + FONT;
+		var w = 0;
+		String(t.text || '').split('\n').forEach(function (line) {
+			w = Math.max(w, measureCtx.measureText(line || ' ').width);
+		});
+		t.set('width', Math.ceil(w + t.fontSize * 0.4));
+		t.initDimensions();
+		t.setCoords();
+	}
+
+	function makeText(x, y, color, fontSize) {
 		var text = new fabric.Textbox('Text', {
 			left: x,
 			top: y,
-			width: width,
+			width: fontSize * 3,
 			splitByGrapheme: false,
 			fontFamily: FONT,
 			fontWeight: '700',
@@ -167,6 +184,8 @@
 			paintFirst: 'stroke',
 			sfType: 'text'
 		});
+		text.setControlsVisibility({ mt: false, mb: false });
+		fitTextWidth(text);
 		return styleControls(text);
 	}
 
@@ -490,7 +509,11 @@
 				return;
 			}
 			if (tool === 'text') {
-				var text = makeText(p.x, p.y, color, (12 + size * 2.5) * unit(), 320 * unit());
+				var text = makeText(p.x, p.y, color, (12 + size * 2.5) * unit());
+					text.on('changed', function () {
+						fitTextWidth(text);
+						canvas.requestRenderAll();
+					});
 				text.on('editing:entered', function () {
 					if (text.hiddenTextarea) {
 						text.hiddenTextarea.classList.add('stillframe-text-input');
@@ -565,9 +588,23 @@
 			}
 			commit();
 		});
+		// A drag-selected group of marks gets the same solid controls as a single mark.
+		function styleSelection() {
+			var a = canvas.getActiveObject();
+			if (a && String(a.type).toLowerCase() === 'activeselection') {
+				styleControls(a);
+				a.set({ borderDashArray: null });
+			}
+		}
+		canvas.on('selection:created', styleSelection);
+		canvas.on('selection:updated', styleSelection);
+
 		// Resizing text with a corner handle changes its size and box, never a stretched scale.
 		canvas.on('object:modified', function (opt) {
 			var t = opt && opt.target;
+			if (t && t.sfType === 'text' && opt.transform && (opt.transform.corner === 'ml' || opt.transform.corner === 'mr')) {
+				t.sfManual = true;
+			}
 			if (t && t.sfType === 'text' && (t.scaleX !== 1 || t.scaleY !== 1)) {
 				var k = t.scaleX;
 				t.set({ fontSize: t.fontSize * k, width: t.width * k, strokeWidth: Math.max(2, t.fontSize * k / 6), scaleX: 1, scaleY: 1 });
