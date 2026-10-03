@@ -74,10 +74,27 @@
 
 	// The capture opens the same pop-up editor as the top-bar capture,
 	// with every chosen device ready to switch between.
+	var errorNode = null;
+
+	function showError(message) {
+		if (!errorNode) {
+			errorNode = document.createElement('p');
+			errorNode.className = 'stillframe-tools-error';
+			errorNode.setAttribute('role', 'alert');
+			errorNode.style.cssText = 'margin:8px 0 0;color:#b42318;font-size:13px;font-weight:600';
+			if (startBtn && startBtn.parentNode) {
+				startBtn.parentNode.insertBefore(errorNode, startBtn);
+			}
+		}
+		errorNode.textContent = message;
+		errorNode.hidden = !message;
+	}
+
 	function startCapture() {
+		showError('');
 		var url = getTargetUrl();
 		if (!url) {
-			window.alert('Please select a target page or enter a URL to capture.');
+			showError('Please select a target page or enter a URL to capture.');
 			if (pagePicker) {
 				pagePicker.focusCustom();
 			}
@@ -86,13 +103,13 @@
 
 		var devices = getSelectedDevices();
 		if (!devices.length) {
-			window.alert('Please select at least one device to capture.');
+			showError('Please select at least one device to capture.');
 			return;
 		}
 
 		var engine = window.StillframeCapture || {};
 		if (typeof engine.openMultiCapture !== 'function') {
-			window.alert('Stillframe is still loading. Please try again in a moment.');
+			showError('Stillframe is still loading. Please try again in a moment.');
 			return;
 		}
 

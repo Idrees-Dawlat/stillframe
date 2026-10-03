@@ -73,6 +73,10 @@
 			.replace(/&amp;/g, '&');
 	}
 
+	function tr(key, fallback) {
+		return text(key) || fallback;
+	}
+
 	function lockScroll() {
 		document.documentElement.classList.add('stillframe-locked');
 		document.body.classList.add('stillframe-locked');
@@ -3383,11 +3387,11 @@
 		var directMenu = element('div', { className: 'stillframe-snip__direct-menu' });
 		directMenu.hidden = true;
 
-		var directTitle = element('div', { className: 'stillframe-hub-sec-title', text: 'Direct Page Capture' });
+		var directTitle = element('div', { className: 'stillframe-hub-sec-title', text: tr('directTitle', 'Direct Page Capture') });
 
 		// Page Select
 		var hubPageWrap = element('div', { className: 'stillframe-hub-field' });
-		hubPageWrap.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Target Page' }));
+		hubPageWrap.appendChild(element('span', { className: 'stillframe-hub-label', text: tr('targetPage', 'Target Page') }));
 
 		var isAdmin = window.location.pathname.indexOf('/wp-admin') !== -1;
 		var curPath = window.location.pathname;
@@ -3395,7 +3399,7 @@
 			pages: config && config.sitePages,
 			homeUrl: (config && config.homeUrl) || '',
 			includeCurrent: true,
-			currentLabel: (isAdmin ? 'Current Admin Screen' : 'Current Screen') + ' (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')',
+			currentLabel: (isAdmin ? tr('currentAdmin', 'Current Admin Screen') : tr('currentScreen', 'Current Screen')) + ' (' + (curPath.length > 20 ? curPath.slice(0, 18) + '...' : curPath) + ')',
 			onEscape: function () {
 				closeAllMenus();
 				directButton.focus();
@@ -3406,12 +3410,12 @@
 		// Multi-Device Selection Cards (Desktop, iPad, Mobile)
 		var hubDevGroup = element('div', { className: 'stillframe-dev-cards-group' });
 		var hubDevHeader = element('div', { className: 'stillframe-dev-cards-header' });
-		hubDevHeader.appendChild(element('span', { className: 'stillframe-dev-cards-title', text: 'Select Devices to Capture' }));
+		hubDevHeader.appendChild(element('span', { className: 'stillframe-dev-cards-title', text: tr('selectDevices', 'Select Devices to Capture') }));
 
 		var hubDevQuickToggle = element('button', {
 			type: 'button',
 			className: 'stillframe-dev-cards-quick',
-			text: 'Desktop Only'
+			text: tr('desktopOnly', 'Desktop Only')
 		});
 		hubDevHeader.appendChild(hubDevQuickToggle);
 		hubDevGroup.appendChild(hubDevHeader);
@@ -3438,11 +3442,15 @@
 			checkBadge.appendChild(iconSvg('check', 10));
 			card.appendChild(checkBadge);
 
-			var iconEl = iconSvg(d.icon, 20);
+			var previewFrame = element('span', { className: 'stillframe-dev-card__frame', 'aria-hidden': 'true' });
+			previewFrame.style.height = '38px';
+			previewFrame.style.width = Math.round(38 * d.width / d.estHeight) + 'px';
+			var iconEl = iconSvg(d.icon, 16);
 			iconEl.classList.add('stillframe-dev-card__icon');
-			card.appendChild(iconEl);
+			previewFrame.appendChild(iconEl);
+			card.appendChild(previewFrame);
 
-			card.appendChild(element('span', { className: 'stillframe-dev-card__name', text: d.label }));
+			card.appendChild(element('span', { className: 'stillframe-dev-card__name', text: tr('dev_' + d.id, d.label) }));
 			card.appendChild(element('span', { className: 'stillframe-dev-card__dim', text: d.badge }));
 
 			function toggleCard() {
@@ -3507,16 +3515,16 @@
 		hubAdminCb.checked = true;
 		hubAdminLabel.appendChild(hubAdminCb);
 		hubAdminLabel.appendChild(element('span', { className: 'stillframe-hub-toggle__track' }));
-		hubAdminLabel.appendChild(element('span', { text: 'Hide admin bar in screenshot' }));
+		hubAdminLabel.appendChild(element('span', { text: tr('hideAdminBar', 'Hide admin bar in screenshot') }));
 
 		// Resolution Quality - pill selector (1x / 2x / 3x)
 		var hubResField = element('div', { className: 'stillframe-hub-field' });
-		hubResField.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Resolution Quality' }));
+		hubResField.appendChild(element('span', { className: 'stillframe-hub-label', text: tr('resQuality', 'Resolution Quality') }));
 		var hubResRow = element('div', { className: 'stillframe-hub-res-row' });
 		var hubResOptions = [
-			{ value: '1', label: '1x Standard', title: 'Same pixels as the screen' },
-			{ value: '2', label: '2x Retina', default: true },
-			{ value: '3', label: '3x Ultra' }
+			{ value: '1', label: tr('res1', '1x Standard') },
+			{ value: '2', label: tr('res2', '2x Retina'), default: true },
+			{ value: '3', label: tr('res3', '3x Ultra') }
 		];
 		var hubResSelected = '2';
 		hubResOptions.forEach(function (opt) {
@@ -3530,6 +3538,7 @@
 				stopBar(e);
 				hubResSelected = opt.value;
 				hubResHelp.textContent = RES_HELP[opt.value] || '';
+				updateSizeLine();
 				Array.prototype.forEach.call(hubResRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
 					p.classList.toggle('is-active', p === pill);
 				});
@@ -3538,20 +3547,20 @@
 		});
 		hubResField.appendChild(hubResRow);
 		var RES_HELP = {
-			'1': 'Same pixels as the screen. Smallest files, good for docs and chat.',
-			'2': 'Sharp on modern high-density displays. Recommended.',
-			'3': 'Maximum detail for print or zooming. Large files; very long pages may be reduced automatically.'
+			'1': tr('res1Help', 'Same pixels as the screen. Smallest files, good for docs and chat.'),
+			'2': tr('res2Help', 'Sharp on modern high-density displays. Recommended.'),
+			'3': tr('res3Help', 'Maximum detail for print or zooming. Large files; very long pages may be reduced automatically.')
 		};
 		var hubResHelp = element('span', { className: 'stillframe-hub-help', text: RES_HELP['2'] });
 		hubResField.appendChild(hubResHelp);
 
 		// Capture Height - pill selector (Viewport / Full Page)
 		var hubHeightField = element('div', { className: 'stillframe-hub-field' });
-		hubHeightField.appendChild(element('span', { className: 'stillframe-hub-label', text: 'Capture Height' }));
+		hubHeightField.appendChild(element('span', { className: 'stillframe-hub-label', text: tr('captureHeight', 'Capture Height') }));
 		var hubHeightRow = element('div', { className: 'stillframe-hub-res-row' });
 		var hubHeightOptions = [
-			{ value: 'viewport', label: 'Viewport', default: true },
-			{ value: 'fullpage', label: 'Full Page' }
+			{ value: 'viewport', label: tr('heightViewport', 'Viewport'), default: true },
+			{ value: 'fullpage', label: tr('heightFull', 'Full Page') }
 		];
 		var hubHeightSelected = 'viewport';
 		hubHeightOptions.forEach(function (opt) {
@@ -3565,6 +3574,7 @@
 				stopBar(e);
 				hubHeightSelected = opt.value;
 				hubHeightHelp.textContent = HEIGHT_HELP[opt.value] || '';
+				updateSizeLine();
 				Array.prototype.forEach.call(hubHeightRow.querySelectorAll('.stillframe-hub-pill'), function (p) {
 					p.classList.toggle('is-active', p === pill);
 				});
@@ -3573,11 +3583,12 @@
 		});
 		hubHeightField.appendChild(hubHeightRow);
 		var HEIGHT_HELP = {
-			viewport: 'Only the first screen (above the fold).',
-			fullpage: 'The entire page, top to bottom.'
+			viewport: tr('heightViewportHelp', 'Only the first screen (above the fold).'),
+			fullpage: tr('heightFullHelp', 'The entire page, top to bottom.')
 		};
 		var hubHeightHelp = element('span', { className: 'stillframe-hub-help', text: HEIGHT_HELP.viewport });
 		hubHeightField.appendChild(hubHeightHelp);
+		var hubSizeLine = element('span', { className: 'stillframe-hub-size' });
 
 		// Capture Button (NO lightning emoji! Uses clean camera SVG icon)
 		var hubSubmit = element('button', {
@@ -3585,23 +3596,41 @@
 			className: 'stillframe-hub-submit'
 		});
 		hubSubmit.appendChild(iconSvg('camera', 16));
-		var hubSubmitText = element('span', { text: 'Capture All 3 Devices & Open' });
+		var hubSubmitText = element('span', { text: tr('captureAll', 'Capture All 3 Devices & Open') });
 		hubSubmit.appendChild(hubSubmitText);
+
+		// Approximate output size for the chosen devices, quality and height.
+		function updateSizeLine() {
+			var scaleNow = parseInt(hubResSelected, 10) || 2;
+			var full = hubHeightSelected === 'fullpage';
+			var parts = availableDevices.filter(function (d) {
+				return devCards[d.id] && devCards[d.id].classList.contains('is-selected');
+			}).map(function (d) {
+				var w = d.width * scaleNow;
+				if (full) {
+					return d.label + ' ' + w + ' px wide, full height';
+				}
+				var h = d.estHeight * scaleNow;
+				return d.label + ' ' + w + ' \u00d7 ' + h + ' px, about ' + formatBytes(Math.round(w * h * 0.5));
+			});
+			hubSizeLine.textContent = parts.join(' \u00b7 ');
+		}
 
 		function updateSubmitLabel() {
 			var selected = availableDevices.filter(function (d) {
 				return devCards[d.id].classList.contains('is-selected');
 			});
 			if (selected.length === 3) {
-				hubSubmitText.textContent = 'Capture All 3 Devices & Open';
-				hubDevQuickToggle.textContent = 'Desktop Only';
+				hubSubmitText.textContent = tr('captureAll', 'Capture All 3 Devices & Open');
+				hubDevQuickToggle.textContent = tr('desktopOnly', 'Desktop Only');
 			} else if (selected.length === 2) {
-				hubSubmitText.textContent = 'Capture ' + selected.length + ' Devices & Open';
-				hubDevQuickToggle.textContent = 'Select All (3)';
+				hubSubmitText.textContent = tr('captureN', 'Capture %d Devices & Open').replace('%d', String(selected.length));
+				hubDevQuickToggle.textContent = tr('selectAll', 'Select All (3)');
 			} else if (selected.length === 1) {
-				hubSubmitText.textContent = 'Capture ' + selected[0].label + ' & Open';
-				hubDevQuickToggle.textContent = 'Select All (3)';
+				hubSubmitText.textContent = tr('captureOne', 'Capture %s & Open').replace('%s', selected[0].label);
+				hubDevQuickToggle.textContent = tr('selectAll', 'Select All (3)');
 			}
+			updateSizeLine();
 		}
 
 		hubSubmit.addEventListener('click', function (e) {
@@ -3635,7 +3664,11 @@
 		directMenu.appendChild(hubAdminLabel);
 		directMenu.appendChild(hubResField);
 		directMenu.appendChild(hubHeightField);
-		directMenu.appendChild(hubSubmit);
+		directMenu.appendChild(hubSizeLine);
+		var hubFooter = element('div', { className: 'stillframe-hub-footer' });
+		hubFooter.appendChild(hubSubmit);
+		directMenu.appendChild(hubFooter);
+		updateSizeLine();
 
 		directButton.addEventListener('click', function (event) {
 			stopBar(event);
@@ -4835,10 +4868,10 @@
 		}
 
 		if (opts.includeCurrent) {
-			addEntry({ key: '__current__', title: opts.currentLabel || 'Current screen', path: window.location.pathname, type: '', parent: '', group: 'Current screen' });
+			addEntry({ key: '__current__', title: opts.currentLabel || tr('pickCurrent', 'Current screen'), path: window.location.pathname, type: '', parent: '', group: tr('pickCurrent', 'Current screen') });
 		}
 		if (homeUrl) {
-			addEntry({ key: homeUrl, title: 'Home', path: pathOf(homeUrl), type: '', parent: '', group: 'Home' });
+			addEntry({ key: homeUrl, title: tr('pickHome', 'Home'), path: pathOf(homeUrl), type: '', parent: '', group: tr('pickHome', 'Home') });
 		}
 		(Array.isArray(opts.pages) ? opts.pages : []).forEach(function (p) {
 			if (!p || !p.url || p.url === homeUrl) {
@@ -4851,7 +4884,7 @@
 				path: p.path || pathOf(p.url),
 				type: type,
 				parent: p.parent || '',
-				group: type === 'page' ? 'Pages' : (type === 'post' ? 'Posts' : pickerTypeLabel(type))
+				group: type === 'page' ? tr('pickPages', 'Pages') : (type === 'post' ? tr('pickPosts', 'Posts') : pickerTypeLabel(type))
 			});
 		});
 
@@ -4863,21 +4896,21 @@
 		var customInput = element('input', {
 			type: 'url',
 			className: 'stillframe-picker__input',
-			placeholder: 'Custom URL: paste any address...',
-			'aria-label': 'Custom URL',
+			placeholder: tr('pickCustomPlaceholder', 'Custom URL: paste any address...'),
+			'aria-label': tr('pickCustom', 'Custom URL'),
 			autocomplete: 'off',
 			spellcheck: 'false'
 		});
-		var useButton = element('button', { type: 'button', className: 'stillframe-picker__use', text: 'Use' });
+		var useButton = element('button', { type: 'button', className: 'stillframe-picker__use', text: tr('pickUse', 'Use') });
 		customRow.appendChild(customInput);
 		customRow.appendChild(useButton);
 
 		var search = element('input', {
 			type: 'text',
 			className: 'stillframe-picker__input stillframe-picker__search',
-			placeholder: 'Search pages by title, path or type...',
+			placeholder: tr('pickSearchPlaceholder', 'Search pages by title, path or type...'),
 			role: 'combobox',
-			'aria-label': 'Search pages',
+			'aria-label': tr('pickSearch', 'Search pages'),
 			'aria-expanded': 'true',
 			'aria-controls': uid + '-list',
 			'aria-autocomplete': 'list',
@@ -4934,7 +4967,7 @@
 		function updateSummary() {
 			var label = '';
 			if (sel === CUSTOM) {
-				label = customInput.value.trim() || 'Enter a URL above';
+				label = customInput.value.trim() || tr('pickEnterUrl', 'Enter a URL below');
 			} else {
 				var entry = entryFor(sel);
 				label = entry ? entry.title + (entry.path ? '  ' + entry.path : '') : sel;
@@ -5029,11 +5062,11 @@
 			});
 
 			if (!matched.length) {
-				list.appendChild(element('div', { className: 'stillframe-picker__note', text: 'No matching pages. Use the Custom URL field above.' }));
+				list.appendChild(element('div', { className: 'stillframe-picker__note', text: tr('pickNoMatch', 'No matching pages. Use the Custom URL field.') }));
 			} else if (matched.length > MAX_ROWS) {
 				list.appendChild(element('div', {
 					className: 'stillframe-picker__note',
-					text: 'Showing ' + MAX_ROWS + ' of ' + matched.length + '. Keep typing to narrow the list.'
+					text: tr('pickShowing', 'Showing %1$d of %2$d. Keep typing to narrow the list.').replace('%1$d', String(MAX_ROWS)).replace('%2$d', String(matched.length))
 				}));
 			}
 
