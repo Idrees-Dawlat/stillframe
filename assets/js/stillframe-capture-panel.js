@@ -40,6 +40,13 @@
 	var snipCleanup = null;
 	var toolColor = '#ef4444';
 	var toolSize = 4;
+	var currentTool = 'pen';
+	var currentFont = 'sans';
+	var currentBold = false;
+	var currentTextSize = 24;
+	var currentSliderMode = 'stroke';
+	var syncToolbarOptions = null;
+	var onTextSizeUpdate = null;
 	var viewShot = {
 		id: 0,
 		canvas: null,
@@ -56,13 +63,9 @@
 	var IDLE_BEFORE_RENDER_MS = 1500;
 
 	function canPrerender() {
-		if (exactEnabled()) {
-			return false;
-		}
-		if (viewShot.slow) {
-			return false;
-		}
-		return document.getElementsByTagName('*').length <= HEAVY_PAGE_NODES;
+		// Do not prerender in the background during active capture — it freezes the main thread
+		// on pages with many DOM nodes, causing dropped clicks and sluggish interaction.
+		return false;
 	}
 
 	function text(key) {
@@ -626,20 +629,27 @@
 		}
 		editor = api.createAnnotationEditor(canvasWrap, image, {
 			onChange: syncMarkButtons,
-			onSelect: renderProps,
+			onSelect: function (info) {
+				if (typeof syncToolbarOptions === 'function') {
+					syncToolbarOptions(info, currentTool);
+				}
+			},
 			onTextSize: function (value) {
-				if (propsSize) {
-					propsSize.range.value = String(value);
-					propsSize.out.value = String(value);
+				if (typeof onTextSizeUpdate === 'function') {
+					onTextSizeUpdate(value);
 				}
 			},
 			onToolChange: function (name) {
+				currentTool = name;
 				if (!panel) {
 					return;
 				}
 				Array.prototype.forEach.call(panel.querySelectorAll('.stillframe-tool'), function (button) {
 					button.setAttribute('aria-pressed', button.getAttribute('data-tool') === name ? 'true' : 'false');
 				});
+				if (typeof syncToolbarOptions === 'function') {
+					syncToolbarOptions(null, name);
+				}
 			}
 		});
 		editor.setTool('pen');
@@ -667,111 +677,9 @@
 
 	// Options for the mark that is selected: font, number colour, outline or filled.
 	function renderProps(info) {
-		if (!propsNode) {
-			return;
+		if (typeof syncToolbarOptions === 'function') {
+			syncToolbarOptions(info, currentTool);
 		}
-		while (propsNode.firstChild) {
-			propsNode.removeChild(propsNode.firstChild);
-		}
-		propsSize = null;
-		var type = info && info.type;
-		var hasFont = type === 'text' || type === 'step';
-		if (!hasFont && type !== 'rect' && type !== 'circle') {
-			propsNode.hidden = true;
-			return;
-		}
-		function field(label, control) {
-			var box = element('label', { className: 'stillframe-prop' });
-			box.appendChild(element('span', { className: 'stillframe-prop__label', text: label }));
-			box.appendChild(control);
-			propsNode.appendChild(box);
-		}
-		if (hasFont) {
-			var fontSelect = element('select', { className: 'stillframe-prop__select', 'aria-label': 'Font' });
-			FONT_CHOICES.forEach(function (choice) {
-				fontSelect.appendChild(element('option', { value: choice[0], text: choice[1] }));
-			});
-			fontSelect.value = info.font || 'sans';
-			fontSelect.addEventListener('change', function () {
-				if (editor) {
-					editor.setFont(fontSelect.value);
-				}
-			});
-			field('Font', fontSelect);
-		}
-		if (type === 'step') {
-			var numColor = element('input', { type: 'color', className: 'stillframe-prop__color', 'aria-label': 'Number colour' });
-			numColor.value = /^#[0-9a-f]{6}$/i.test(info.numColor || '') ? info.numColor : '#ffffff';
-			numColor.addEventListener('input', function () {
-				if (editor) {
-					editor.setNumberColor(numColor.value);
-				}
-			});
-			field('Number', numColor);
-		}
-		if (type === 'text') {
-			var sizeBox = element('span', { className: 'stillframe-prop__size' });
-			var sizeRange = element('input', { type: 'range', className: 'stillframe-prop__range', min: '8', max: String(info.fontMax || 200), step: '1', 'aria-label': 'Text size' });
-			var sizeOut = element('input', { type: 'number', className: 'stillframe-prop__number', min: '6', max: '1200', step: '1', 'aria-label': 'Text size in pixels' });
-			sizeRange.value = String(info.fontSize || 24);
-			sizeOut.value = String(info.fontSize || 24);
-			sizeRange.addEventListener('input', function () {
-				sizeOut.value = sizeRange.value;
-				if (editor) {
-					editor.setFontSize(sizeRange.value);
-				}
-			});
-			sizeOut.addEventListener('input', function () {
-				var value = parseFloat(sizeOut.value);
-				if (value >= 6) {
-					sizeRange.value = String(Math.min(value, parseFloat(sizeRange.max)));
-					if (editor) {
-						editor.setFontSize(value);
-					}
-				}
-			});
-			sizeBox.appendChild(sizeRange);
-			sizeBox.appendChild(sizeOut);
-			propsSize = { range: sizeRange, out: sizeOut };
-			field('Size', sizeBox);
-			var bold = element('button', { type: 'button', className: 'stillframe-prop__toggle', 'aria-pressed': info.bold ? 'true' : 'false', text: 'B', title: 'Bold' });
-			bold.addEventListener('click', function () {
-				if (editor) {
-					editor.setBold(bold.getAttribute('aria-pressed') !== 'true');
-				}
-			});
-			field('Weight', bold);
-		}
-		if (type === 'rect' || type === 'circle') {
-			var seg = element('div', { className: 'stillframe-prop__seg', role: 'group' });
-			[['Outline', false], ['Filled', true]].forEach(function (choice) {
-				var button = element('button', { type: 'button', className: 'stillframe-prop__seg-btn', text: choice[0], 'aria-pressed': !!info.filled === choice[1] ? 'true' : 'false' });
-				button.addEventListener('click', function () {
-					if (editor) {
-						editor.setFilled(choice[1]);
-					}
-				});
-				seg.appendChild(button);
-			});
-			field('Style', seg);
-			var dash = element('button', { type: 'button', className: 'stillframe-prop__toggle', 'aria-pressed': info.dashed ? 'true' : 'false', text: 'Dashed' });
-			dash.addEventListener('click', function () {
-				if (editor) {
-					editor.setDashed(dash.getAttribute('aria-pressed') !== 'true');
-				}
-			});
-			field('Line', dash);
-			if (type === 'rect') {
-				var round = element('button', { type: 'button', className: 'stillframe-prop__toggle', 'aria-pressed': info.rounded ? 'true' : 'false', text: 'Rounded' });
-				round.addEventListener('click', function () {
-					if (editor) {
-						editor.setRounded(round.getAttribute('aria-pressed') !== 'true');
-					}
-				});
-				field('Corners', round);
-			}
-		}
-		propsNode.hidden = false;
 	}
 
 	function loadImage(blob) {
@@ -2577,11 +2485,15 @@
 			button.setAttribute('data-key', key);
 			button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
 			button.addEventListener('click', function () {
+				currentTool = name;
 				Array.prototype.forEach.call(markGroup.querySelectorAll('.stillframe-tool'), function (item) {
 					item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
 				});
 				if (editor) {
 					editor.setTool(name);
+				}
+				if (typeof syncToolbarOptions === 'function') {
+					syncToolbarOptions(null, name);
 				}
 				// Drop focus so the clicked tool does not keep a ring once another tool is chosen with a key.
 				button.blur();
@@ -2658,12 +2570,179 @@
 		});
 		sizeSlider.value = String(toolSize);
 		sizeSlider.addEventListener('input', function () {
-			toolSize = parseFloat(sizeSlider.value);
-			if (editor) {
-				editor.setSize(toolSize);
+			var val = parseFloat(sizeSlider.value);
+			if (currentSliderMode === 'text') {
+				currentTextSize = val;
+				sizeSlider.title = 'Text size (' + val + 'px)';
+				if (editor && editor.setFontSize) {
+					editor.setFontSize(val);
+				}
+			} else {
+				toolSize = val;
+				sizeSlider.title = (text('thickness') || 'Line thickness') + ' (' + val + ')';
+				if (editor && editor.setSize) {
+					editor.setSize(val);
+				}
 			}
 		});
 		sizeGroup.appendChild(sizeSlider);
+
+		var textOptGroup = element('div', {
+			className: 'stillframe-result__text-opts',
+			role: 'group',
+			'aria-label': 'Text options'
+		});
+		textOptGroup.style.display = 'none';
+
+		var fontSelect = element('select', { className: 'stillframe-prop__select', 'aria-label': 'Font family', title: 'Font family' });
+		FONT_CHOICES.forEach(function (choice) {
+			fontSelect.appendChild(element('option', { value: choice[0], text: choice[1] }));
+		});
+		fontSelect.value = currentFont || 'sans';
+		fontSelect.addEventListener('change', function () {
+			currentFont = fontSelect.value;
+			if (editor && editor.setFont) {
+				editor.setFont(currentFont);
+			}
+		});
+		textOptGroup.appendChild(fontSelect);
+
+		var boldBtn = element('button', {
+			type: 'button',
+			className: 'stillframe-prop__toggle',
+			'aria-pressed': currentBold ? 'true' : 'false',
+			text: 'B',
+			title: 'Bold (toggle)'
+		});
+		boldBtn.addEventListener('click', function () {
+			currentBold = boldBtn.getAttribute('aria-pressed') !== 'true';
+			boldBtn.setAttribute('aria-pressed', currentBold ? 'true' : 'false');
+			if (editor && editor.setBold) {
+				editor.setBold(currentBold);
+			}
+		});
+		textOptGroup.appendChild(boldBtn);
+
+		var shapeOptGroup = element('div', {
+			className: 'stillframe-result__shape-opts',
+			role: 'group',
+			'aria-label': 'Shape options'
+		});
+		shapeOptGroup.style.display = 'none';
+
+		var fillBtn = element('button', {
+			type: 'button',
+			className: 'stillframe-prop__toggle',
+			'aria-pressed': 'false',
+			text: 'Fill',
+			title: 'Fill shape'
+		});
+		fillBtn.addEventListener('click', function () {
+			var isFilled = fillBtn.getAttribute('aria-pressed') !== 'true';
+			fillBtn.setAttribute('aria-pressed', isFilled ? 'true' : 'false');
+			if (editor && editor.setFilled) {
+				editor.setFilled(isFilled);
+			}
+		});
+		shapeOptGroup.appendChild(fillBtn);
+
+		var dashBtn = element('button', {
+			type: 'button',
+			className: 'stillframe-prop__toggle',
+			'aria-pressed': 'false',
+			text: 'Dash',
+			title: 'Dashed line'
+		});
+		dashBtn.addEventListener('click', function () {
+			var isDashed = dashBtn.getAttribute('aria-pressed') !== 'true';
+			dashBtn.setAttribute('aria-pressed', isDashed ? 'true' : 'false');
+			if (editor && editor.setDashed) {
+				editor.setDashed(isDashed);
+			}
+		});
+		shapeOptGroup.appendChild(dashBtn);
+
+		var roundBtn = element('button', {
+			type: 'button',
+			className: 'stillframe-prop__toggle',
+			'aria-pressed': 'false',
+			text: 'Round',
+			title: 'Rounded corners'
+		});
+		roundBtn.addEventListener('click', function () {
+			var isRounded = roundBtn.getAttribute('aria-pressed') !== 'true';
+			roundBtn.setAttribute('aria-pressed', isRounded ? 'true' : 'false');
+			if (editor && editor.setRounded) {
+				editor.setRounded(isRounded);
+			}
+		});
+		shapeOptGroup.appendChild(roundBtn);
+
+		syncToolbarOptions = function (info, activeToolName) {
+			var toolName = activeToolName || currentTool || 'pen';
+			var selType = info && info.type;
+			var isText = selType === 'text' || (!selType && toolName === 'text');
+			var isShape = selType === 'rect' || selType === 'circle' || (!selType && (toolName === 'rect' || toolName === 'circle'));
+
+			if (isText) {
+				currentSliderMode = 'text';
+				textOptGroup.style.display = 'inline-flex';
+				shapeOptGroup.style.display = 'none';
+				sizeSlider.min = '12';
+				sizeSlider.max = '120';
+				sizeSlider.step = '1';
+				if (info && info.fontSize) {
+					currentTextSize = info.fontSize;
+				}
+				sizeSlider.value = String(currentTextSize || 24);
+				sizeSlider.title = 'Text size (' + sizeSlider.value + 'px)';
+				sizeSlider.setAttribute('aria-label', 'Text size');
+				if (info && info.font) {
+					currentFont = info.font;
+					fontSelect.value = currentFont;
+				}
+				if (info && typeof info.bold === 'boolean') {
+					currentBold = info.bold;
+					boldBtn.setAttribute('aria-pressed', currentBold ? 'true' : 'false');
+				}
+			} else if (isShape) {
+				currentSliderMode = 'stroke';
+				textOptGroup.style.display = 'none';
+				shapeOptGroup.style.display = 'inline-flex';
+				sizeSlider.min = '1';
+				sizeSlider.max = '16';
+				sizeSlider.step = '0.5';
+				sizeSlider.value = String(toolSize || 3);
+				sizeSlider.title = (text('thickness') || 'Line thickness') + ' (' + sizeSlider.value + ')';
+				sizeSlider.setAttribute('aria-label', text('thickness') || 'Line thickness');
+				if (info) {
+					fillBtn.setAttribute('aria-pressed', info.filled ? 'true' : 'false');
+					dashBtn.setAttribute('aria-pressed', info.dashed ? 'true' : 'false');
+					roundBtn.style.display = (selType === 'rect' || toolName === 'rect') ? 'inline-flex' : 'none';
+					roundBtn.setAttribute('aria-pressed', info.rounded ? 'true' : 'false');
+				} else {
+					roundBtn.style.display = (toolName === 'rect') ? 'inline-flex' : 'none';
+				}
+			} else {
+				currentSliderMode = 'stroke';
+				textOptGroup.style.display = 'none';
+				shapeOptGroup.style.display = 'none';
+				sizeSlider.min = '1';
+				sizeSlider.max = '16';
+				sizeSlider.step = '0.5';
+				sizeSlider.value = String(toolSize || 3);
+				sizeSlider.title = (text('thickness') || 'Line thickness') + ' (' + sizeSlider.value + ')';
+				sizeSlider.setAttribute('aria-label', text('thickness') || 'Line thickness');
+			}
+		};
+
+		onTextSizeUpdate = function (value) {
+			if (currentSliderMode === 'text') {
+				currentTextSize = value;
+				sizeSlider.value = String(value);
+				sizeSlider.title = 'Text size (' + value + 'px)';
+			}
+		};
 
 		var historyGroup = element('div', {
 			className: 'stillframe-result__history',
@@ -2690,6 +2769,8 @@
 		toolsWrap.appendChild(markGroup);
 		toolsWrap.appendChild(colorGroup);
 		toolsWrap.appendChild(sizeGroup);
+		toolsWrap.appendChild(textOptGroup);
+		toolsWrap.appendChild(shapeOptGroup);
 		toolsWrap.appendChild(historyGroup);
 
 		var saveGroup = element('div', { className: 'stillframe-result__actions' });
@@ -3072,10 +3153,7 @@
 		mainBody.appendChild(drawer);
 
 		win.appendChild(heading);
-		propsNode = element('div', { className: 'stillframe-result__props' });
-		propsNode.hidden = true;
 		win.appendChild(toolbar);
-		win.appendChild(propsNode);
 		win.appendChild(mainBody);
 		win.appendChild(statusNode);
 		root.appendChild(win);
@@ -3582,12 +3660,13 @@
 			devItem.appendChild(element('span', { text: d.label }));
 			devItem.appendChild(element('small', { text: d.badge }));
 			devItem.addEventListener('click', function (e) {
-				stopBar(e);
+				e.stopPropagation();
+				touch();
 				frameDevice(d);
 			});
 			devStrip.appendChild(devItem);
 		});
-		devStrip.addEventListener('pointerdown', stopBar);
+		
 
 		function updateDevStrip() {
 			if (!devStrip) {
@@ -3613,7 +3692,7 @@
 			if (!rect.width) {
 				return;
 			}
-			devStrip.style.top = Math.round(rect.bottom - 1) + 'px';
+			devStrip.style.top = Math.round(rect.bottom + 6) + 'px';
 			devStrip.style.left = Math.round(rect.left + rect.width / 2) + 'px';
 		}
 		window.addEventListener('resize', function () {
@@ -4065,6 +4144,15 @@
 		}
 
 		function pickWindow(clientX, clientY) {
+			var barRect = bar ? bar.getBoundingClientRect() : null;
+			var devRect = devStrip && !devStrip.hidden ? devStrip.getBoundingClientRect() : null;
+			var bottomEdge = barRect ? barRect.bottom : 0;
+			if (devRect && devRect.bottom > bottomEdge) {
+				bottomEdge = devRect.bottom;
+			}
+			if (clientY <= bottomEdge + 10) {
+				return null;
+			}
 			var stack = document.elementsFromPoint(clientX, clientY) || [];
 			var node = null;
 			var i;
@@ -4094,6 +4182,9 @@
 		}
 
 		function rectFromNode(node) {
+			if (!node) {
+				return null;
+			}
 			var r = node.getBoundingClientRect();
 			return {
 				x: r.left,
