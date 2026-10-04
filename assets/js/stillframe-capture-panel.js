@@ -14,6 +14,8 @@
 	var returnFocus = null;
 	var captured = null;
 	var statusNode = null;
+	var propsNode = null;
+	var propsSize = null;
 	var customButton = null;
 	var customInput = null;
 	var captureButton = null;
@@ -111,6 +113,19 @@
 	var statusTimer = 0;
 
 	function setStatus(message, linkHref, linkLabel, tone) {
+		// Progress, success and error messages are shown as a toast; plain notes stay in the status line.
+		if (tone && message) {
+			toast(message, tone, linkHref, linkLabel);
+			if (statusNode) {
+				window.clearTimeout(statusTimer);
+				statusNode.removeAttribute('data-tone');
+				statusNode.textContent = '';
+			}
+			return;
+		}
+		if (!message && toastTone === 'busy') {
+			hideToast();
+		}
 		if (!statusNode) {
 			return;
 		}
@@ -153,6 +168,53 @@
 			target: '_blank',
 			rel: 'noopener noreferrer'
 		}));
+	}
+
+	var toastNode = null;
+	var toastTimer = 0;
+	var toastTone = '';
+
+	function hideToast() {
+		window.clearTimeout(toastTimer);
+		toastTone = '';
+		if (toastNode) {
+			toastNode.classList.remove('is-visible');
+		}
+	}
+
+	// A small message pinned to the bottom of the screen, so feedback shows even when no panel is open.
+	function toast(message, tone, linkHref, linkLabel) {
+		window.clearTimeout(toastTimer);
+		if (!toastNode || !toastNode.parentNode) {
+			toastNode = element('div', { className: 'stillframe-toast', role: 'status', 'aria-live': 'polite' });
+			document.body.appendChild(toastNode);
+		}
+		toastTone = tone || 'info';
+		toastNode.setAttribute('data-tone', toastTone);
+		while (toastNode.firstChild) {
+			toastNode.removeChild(toastNode.firstChild);
+		}
+		toastNode.appendChild(element('span', { className: 'stillframe-toast__icon' }));
+		toastNode.appendChild(element('span', { className: 'stillframe-toast__text', text: message }));
+		if (linkHref && linkLabel) {
+			try {
+				var link = new URL(linkHref, window.location.href);
+				if (link.origin === window.location.origin) {
+					toastNode.appendChild(element('a', {
+						className: 'stillframe-toast__link',
+						href: link.toString(),
+						text: linkLabel,
+						target: '_blank',
+						rel: 'noopener noreferrer'
+					}));
+				}
+			} catch (error) {
+				// A bad link only loses the "view" shortcut.
+			}
+		}
+		toastNode.classList.add('is-visible');
+		// A progress toast clears itself if nothing ever replaces it.
+		toastTimer = window.setTimeout(hideToast, tone === 'busy' ? 45000 : (tone === 'error' ? 7000 : 4500));
 	}
 
 	function isScreenMode() {
@@ -564,6 +626,13 @@
 		}
 		editor = api.createAnnotationEditor(canvasWrap, image, {
 			onChange: syncMarkButtons,
+			onSelect: renderProps,
+			onTextSize: function (value) {
+				if (propsSize) {
+					propsSize.range.value = String(value);
+					propsSize.out.value = String(value);
+				}
+			},
 			onToolChange: function (name) {
 				if (!panel) {
 					return;
@@ -586,6 +655,123 @@
 			editorSection.hidden = false;
 		}
 		revealExports();
+	}
+
+	var FONT_CHOICES = [
+		['sans', 'Sans'],
+		['serif', 'Serif'],
+		['rounded', 'Rounded'],
+		['mono', 'Mono'],
+		['impact', 'Bold']
+	];
+
+	// Options for the mark that is selected: font, number colour, outline or filled.
+	function renderProps(info) {
+		if (!propsNode) {
+			return;
+		}
+		while (propsNode.firstChild) {
+			propsNode.removeChild(propsNode.firstChild);
+		}
+		propsSize = null;
+		var type = info && info.type;
+		var hasFont = type === 'text' || type === 'step';
+		if (!hasFont && type !== 'rect' && type !== 'circle') {
+			propsNode.hidden = true;
+			return;
+		}
+		function field(label, control) {
+			var box = element('label', { className: 'stillframe-prop' });
+			box.appendChild(element('span', { className: 'stillframe-prop__label', text: label }));
+			box.appendChild(control);
+			propsNode.appendChild(box);
+		}
+		if (hasFont) {
+			var fontSelect = element('select', { className: 'stillframe-prop__select', 'aria-label': 'Font' });
+			FONT_CHOICES.forEach(function (choice) {
+				fontSelect.appendChild(element('option', { value: choice[0], text: choice[1] }));
+			});
+			fontSelect.value = info.font || 'sans';
+			fontSelect.addEventListener('change', function () {
+				if (editor) {
+					editor.setFont(fontSelect.value);
+				}
+			});
+			field('Font', fontSelect);
+		}
+		if (type === 'step') {
+			var numColor = element('input', { type: 'color', className: 'stillframe-prop__color', 'aria-label': 'Number colour' });
+			numColor.value = /^#[0-9a-f]{6}$/i.test(info.numColor || '') ? info.numColor : '#ffffff';
+			numColor.addEventListener('input', function () {
+				if (editor) {
+					editor.setNumberColor(numColor.value);
+				}
+			});
+			field('Number', numColor);
+		}
+		if (type === 'text') {
+			var sizeBox = element('span', { className: 'stillframe-prop__size' });
+			var sizeRange = element('input', { type: 'range', className: 'stillframe-prop__range', min: '8', max: String(info.fontMax || 200), step: '1', 'aria-label': 'Text size' });
+			var sizeOut = element('input', { type: 'number', className: 'stillframe-prop__number', min: '6', max: '1200', step: '1', 'aria-label': 'Text size in pixels' });
+			sizeRange.value = String(info.fontSize || 24);
+			sizeOut.value = String(info.fontSize || 24);
+			sizeRange.addEventListener('input', function () {
+				sizeOut.value = sizeRange.value;
+				if (editor) {
+					editor.setFontSize(sizeRange.value);
+				}
+			});
+			sizeOut.addEventListener('input', function () {
+				var value = parseFloat(sizeOut.value);
+				if (value >= 6) {
+					sizeRange.value = String(Math.min(value, parseFloat(sizeRange.max)));
+					if (editor) {
+						editor.setFontSize(value);
+					}
+				}
+			});
+			sizeBox.appendChild(sizeRange);
+			sizeBox.appendChild(sizeOut);
+			propsSize = { range: sizeRange, out: sizeOut };
+			field('Size', sizeBox);
+			var bold = element('button', { type: 'button', className: 'stillframe-prop__toggle', 'aria-pressed': info.bold ? 'true' : 'false', text: 'B', title: 'Bold' });
+			bold.addEventListener('click', function () {
+				if (editor) {
+					editor.setBold(bold.getAttribute('aria-pressed') !== 'true');
+				}
+			});
+			field('Weight', bold);
+		}
+		if (type === 'rect' || type === 'circle') {
+			var seg = element('div', { className: 'stillframe-prop__seg', role: 'group' });
+			[['Outline', false], ['Filled', true]].forEach(function (choice) {
+				var button = element('button', { type: 'button', className: 'stillframe-prop__seg-btn', text: choice[0], 'aria-pressed': !!info.filled === choice[1] ? 'true' : 'false' });
+				button.addEventListener('click', function () {
+					if (editor) {
+						editor.setFilled(choice[1]);
+					}
+				});
+				seg.appendChild(button);
+			});
+			field('Style', seg);
+			var dash = element('button', { type: 'button', className: 'stillframe-prop__toggle', 'aria-pressed': info.dashed ? 'true' : 'false', text: 'Dashed' });
+			dash.addEventListener('click', function () {
+				if (editor) {
+					editor.setDashed(dash.getAttribute('aria-pressed') !== 'true');
+				}
+			});
+			field('Line', dash);
+			if (type === 'rect') {
+				var round = element('button', { type: 'button', className: 'stillframe-prop__toggle', 'aria-pressed': info.rounded ? 'true' : 'false', text: 'Rounded' });
+				round.addEventListener('click', function () {
+					if (editor) {
+						editor.setRounded(round.getAttribute('aria-pressed') !== 'true');
+					}
+				});
+				field('Corners', round);
+			}
+		}
+		propsNode.hidden = false;
 	}
 
 	function loadImage(blob) {
@@ -1770,8 +1956,9 @@
 			return;
 		}
 		var scale = captured && captured.scale ? captured.scale : 1;
-		var availW = Math.max(60, stage.clientWidth - 16);
-		var availH = Math.max(60, stage.clientHeight - 16);
+		// Leave a gutter around the picture so marks can be placed past its edges.
+		var availW = Math.max(60, stage.clientWidth - 16 - 112);
+		var availH = Math.max(60, stage.clientHeight - 16 - 112);
 		var w = image.naturalWidth / scale;
 		var h = image.naturalHeight / scale;
 		var ratio = Math.min(1, availW / w, availH / h);
@@ -1820,6 +2007,10 @@
 	}
 
 	var ICONS = {
+		help: [
+			{ tag: 'circle', cx: '12', cy: '12', r: '9' },
+			{ d: 'M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.1 1-1.1 1.8M12 16.8v.01' }
+		],
 		area: [
 			{ tag: 'rect', x: '4', y: '5', width: '16', height: '14', rx: '2.5', 'stroke-dasharray': '3.2 2.6' }
 		],
@@ -2191,6 +2382,7 @@
 		});
 
 		if (btn) btn.disabled = true;
+		toast(tr('savingMedia', 'Saving to Media Library…'), 'busy');
 		getBlobPromise.then(function (blob) {
 			var body = new FormData();
 			body.append('action', 'stillframe_save_media');
@@ -2202,8 +2394,13 @@
 				body: body
 			});
 		}).then(function (res) {
-			return res.json();
-		}).then(function () {
+			return res.json().then(function (payload) {
+				if (!res.ok || !payload || !payload.success) {
+					throw new Error('save');
+				}
+				return payload;
+			});
+		}).then(function (payload) {
 			if (btn) {
 				btn.disabled = false;
 				btn.title = 'Saved to Media Library!';
@@ -2211,8 +2408,11 @@
 				var lbl = btn.querySelector('span');
 				if (lbl) lbl.textContent = 'Saved';
 			}
+			var data = payload && payload.data ? payload.data : null;
+			toast(tr('savedMedia', 'Saved to the Media Library.'), 'success', data && data.editUrl ? String(data.editUrl) : '', tr('viewMedia', 'View'));
 		}).catch(function () {
 			if (btn) btn.disabled = false;
+			toast(tr('mediaFailed', 'Could not save to the Media Library.'), 'error');
 		});
 	}
 
@@ -2383,6 +2583,8 @@
 				if (editor) {
 					editor.setTool(name);
 				}
+				// Drop focus so the clicked tool does not keep a ring once another tool is chosen with a key.
+				button.blur();
 			});
 			markGroup.appendChild(button);
 			return button;
@@ -2397,7 +2599,6 @@
 		addTool('text', text('textTool') || 'Text', 't', false);
 		addTool('step', text('step') || 'Numbered step', 'n', false);
 		addTool('blur', text('blur') || 'Blur (hide sensitive info)', 'b', false);
-
 		var colorGroup = element('div', {
 			className: 'stillframe-result__swatches',
 			role: 'group',
@@ -2423,34 +2624,46 @@
 			});
 			colorGroup.appendChild(swatch);
 		});
+		var customColor = element('input', {
+			type: 'color',
+			className: 'stillframe-swatch-custom',
+			'aria-label': 'Custom colour',
+			title: 'Custom colour'
+		});
+		customColor.value = '#ef4444';
+		customColor.addEventListener('input', function () {
+			toolColor = customColor.value;
+			Array.prototype.forEach.call(colorGroup.querySelectorAll('.stillframe-swatch'), function (item) {
+				item.setAttribute('aria-pressed', 'false');
+			});
+			if (editor) {
+				editor.setColor(toolColor);
+			}
+		});
+		colorGroup.appendChild(customColor);
 
 		var sizeGroup = element('div', {
 			className: 'stillframe-result__sizes',
 			role: 'group',
 			'aria-label': text('thickness') || 'Line thickness'
 		});
-		SIZES.forEach(function (value, index) {
-			var sizeButton = element('button', {
-				type: 'button',
-				className: 'stillframe-size',
-				'aria-label': (text('thickness') || 'Line thickness') + ' ' + (index + 1),
-				title: (text('thickness') || 'Line thickness') + ' ' + (index + 1)
-			});
-			var dot = element('span', { className: 'stillframe-size__dot' });
-			dot.style.setProperty('--sf-dot', (value + 3) + 'px');
-			sizeButton.appendChild(dot);
-			sizeButton.setAttribute('aria-pressed', value === toolSize ? 'true' : 'false');
-			sizeButton.addEventListener('click', function () {
-				toolSize = value;
-				Array.prototype.forEach.call(sizeGroup.querySelectorAll('.stillframe-size'), function (item) {
-					item.setAttribute('aria-pressed', item === sizeButton ? 'true' : 'false');
-				});
-				if (editor) {
-					editor.setSize(value);
-				}
-			});
-			sizeGroup.appendChild(sizeButton);
+		var sizeSlider = element('input', {
+			type: 'range',
+			className: 'stillframe-size-slider',
+			min: '1',
+			max: '16',
+			step: '0.5',
+			'aria-label': text('thickness') || 'Line thickness',
+			title: text('thickness') || 'Line thickness'
 		});
+		sizeSlider.value = String(toolSize);
+		sizeSlider.addEventListener('input', function () {
+			toolSize = parseFloat(sizeSlider.value);
+			if (editor) {
+				editor.setSize(toolSize);
+			}
+		});
+		sizeGroup.appendChild(sizeSlider);
 
 		var historyGroup = element('div', {
 			className: 'stillframe-result__history',
@@ -2859,7 +3072,10 @@
 		mainBody.appendChild(drawer);
 
 		win.appendChild(heading);
+		propsNode = element('div', { className: 'stillframe-result__props' });
+		propsNode.hidden = true;
 		win.appendChild(toolbar);
+		win.appendChild(propsNode);
 		win.appendChild(mainBody);
 		win.appendChild(statusNode);
 		root.appendChild(win);
@@ -3190,6 +3406,8 @@
 		actions.appendChild(resetButton);
 		actions.appendChild(goButton);
 		var sel = null;
+		// Id of the device preset the current selection was framed from, while it is still exactly that frame.
+		var activeDevice = null;
 		var adj = null;
 		var adjFrame = 0;
 
@@ -3214,6 +3432,7 @@
 
 		function setMode(next) {
 			sel = null;
+			activeDevice = null;
 			adj = null;
 			mode = next;
 			root.setAttribute('data-mode', next);
@@ -3227,6 +3446,7 @@
 			}
 			showSelection(null);
 			setHint();
+			updateDevStrip();
 		}
 
 		function stopBar(event) {
@@ -3261,6 +3481,7 @@
 			rectButton.setAttribute('aria-pressed', 'false');
 			windowModeButton.setAttribute('aria-pressed', 'false');
 			fullButton.setAttribute('aria-pressed', 'true');
+			activeDevice = null;
 			sel = { x: 0, y: 0, width: sizeNow.width, height: sizeNow.height };
 			showSelection(sel);
 			scheduleShot(IDLE_BEFORE_RENDER_MS);
@@ -3288,6 +3509,7 @@
 				hint.hidden = false;
 				hint.style.display = '';
 			}
+			updateDevStrip();
 		}
 
 		// --- Section A: Devices Button & Menu (Only Framed Viewports!) ---
@@ -3309,45 +3531,96 @@
 			{ id: 'mobile', width: 390, height: 844, label: 'Mobile', badge: '390px', icon: 'mobile' }
 		];
 
+		function frameDevice(d) {
+			closeAllMenus();
+			hint.hidden = true;
+			hint.style.display = 'none';
+
+			var winW = window.innerWidth || document.documentElement.clientWidth || 1024;
+			var winH = window.innerHeight || document.documentElement.clientHeight || 768;
+			// The frame lives below the bar and its device strip, and above the action buttons that
+			// appear under a selection, so nothing it needs is ever covered.
+			var areaTop = Math.round(bar.getBoundingClientRect().bottom) + 52;
+			var areaH = Math.max(160, winH - areaTop - 76);
+			var areaW = Math.max(160, winW - 32);
+			// Too big for this screen: shrink it, keeping the device's proportions, so a phone still looks like a phone.
+			var fit = Math.min(1, areaW / d.width, areaH / d.height);
+			var targetW = Math.max(120, Math.round(d.width * fit));
+			var targetH = Math.max(120, Math.round(d.height * fit));
+			var targetX = Math.max(16, Math.round((winW - targetW) / 2));
+			var targetY = Math.max(areaTop, Math.round(areaTop + (areaH - targetH) / 2));
+			activeDevice = d.id;
+
+			sel = {
+				x: targetX,
+				y: targetY,
+				width: targetW,
+				height: targetH
+			};
+			mode = 'rect';
+			root.setAttribute('data-mode', 'rect');
+			rectButton.setAttribute('aria-pressed', 'true');
+			windowModeButton.setAttribute('aria-pressed', 'false');
+			fullButton.setAttribute('aria-pressed', 'false');
+			showSelection(sel);
+			scheduleShot(IDLE_BEFORE_RENDER_MS);
+		}
+
+		// In Window mode, three device sizes sit under the bar: one click frames that size on screen.
+		var devStrip = element('div', { className: 'stillframe-snip__devstrip', role: 'group', 'aria-label': 'Device sizes' });
+		devStrip.hidden = true;
+		devStrip.appendChild(element('span', { className: 'stillframe-snip__devstrip-label', text: tr('frameSize', 'Or frame a device') }));
 		devPresets.forEach(function (d) {
 			var devItem = element('button', {
 				type: 'button',
-				className: 'stillframe-hub-preset-btn',
-				title: 'Frame screen at ' + d.label + ' (' + d.width + ' × ' + d.height + ')'
+				className: 'stillframe-snip__devstrip-btn',
+				'data-device': d.id,
+				'aria-pressed': 'false',
+				title: 'Frame the screen at ' + d.label + ' (' + d.width + ' × ' + d.height + ')'
 			});
-			devItem.appendChild(iconSvg(d.icon, 16));
-			devItem.appendChild(element('span', { className: 'stillframe-hub-preset-label', text: d.label }));
-			devItem.appendChild(element('span', { className: 'stillframe-hub-preset-badge', text: d.badge }));
+			devItem.appendChild(iconSvg(d.icon, 15));
+			devItem.appendChild(element('span', { text: d.label }));
+			devItem.appendChild(element('small', { text: d.badge }));
 			devItem.addEventListener('click', function (e) {
 				stopBar(e);
-				closeAllMenus();
-				hint.hidden = true;
-				hint.style.display = 'none';
-
-				var winW = window.innerWidth || document.documentElement.clientWidth || 1024;
-				var winH = window.innerHeight || document.documentElement.clientHeight || 768;
-				var targetW = Math.min(d.width, Math.max(200, winW - 32));
-				var targetH = Math.min(d.height, Math.max(200, winH - 120));
-				var targetX = Math.max(16, Math.round((winW - targetW) / 2));
-				var targetY = Math.max(64, Math.round((winH - targetH) / 2));
-
-				sel = {
-					x: targetX,
-					y: targetY,
-					width: targetW,
-					height: targetH
-				};
-				mode = 'rect';
-				root.setAttribute('data-mode', 'rect');
-				rectButton.setAttribute('aria-pressed', 'true');
-				windowModeButton.setAttribute('aria-pressed', 'false');
-				fullButton.setAttribute('aria-pressed', 'false');
-				showSelection(sel);
-				scheduleShot(IDLE_BEFORE_RENDER_MS);
+				frameDevice(d);
 			});
-			sec1Grid.appendChild(devItem);
+			devStrip.appendChild(devItem);
 		});
+		devStrip.addEventListener('pointerdown', stopBar);
 
+		function updateDevStrip() {
+			if (!devStrip) {
+				return;
+			}
+			if (!sel) {
+				activeDevice = null;
+			}
+			// Shown in Window mode before picking, and kept while a device frame is up so the size can be switched.
+			var show = ((mode === 'window' && !sel) || (activeDevice && sel)) && !root.classList.contains('has-menu-open') && fullButton.getAttribute('aria-pressed') !== 'true';
+			devStrip.hidden = !show;
+			if (show) {
+				Array.prototype.forEach.call(devStrip.querySelectorAll('button'), function (item) {
+					item.setAttribute('aria-pressed', item.getAttribute('data-device') === activeDevice ? 'true' : 'false');
+				});
+				placeDevStrip();
+			}
+		}
+
+		// The strip hangs off the bar like a tab: flush under it and centred on it, whatever the bar's width or position.
+		function placeDevStrip() {
+			var rect = bar.getBoundingClientRect();
+			if (!rect.width) {
+				return;
+			}
+			devStrip.style.top = Math.round(rect.bottom - 1) + 'px';
+			devStrip.style.left = Math.round(rect.left + rect.width / 2) + 'px';
+		}
+		window.addEventListener('resize', function () {
+			if (devStrip && !devStrip.hidden) {
+				placeDevStrip();
+			}
+		});
 
 		var engineLabel = element('label', { className: 'stillframe-hub-toggle sfd-engine' });
 		var engineCb = element('input', { type: 'checkbox', className: 'stillframe-hub-toggle__input' });
@@ -3378,6 +3651,7 @@
 				rectButton.setAttribute('aria-pressed', 'false');
 				windowModeButton.setAttribute('aria-pressed', 'false');
 				root.classList.add('has-menu-open');
+				updateDevStrip();
 				hint.hidden = true;
 				hint.style.display = 'none';
 				if (onOpen) onOpen();
@@ -3408,9 +3682,24 @@
 		var isAdmin = window.location.pathname.indexOf('/wp-admin') !== -1;
 		var curPath = window.location.pathname;
 
-		function sfdRow(label, control) {
+		function sfdRow(label, control, tipLines) {
 			var row = element('div', { className: 'sfd-row' });
-			row.appendChild(element('span', { className: 'sfd-label', text: label }));
+			var head = element('span', { className: 'sfd-label' });
+			head.appendChild(document.createTextNode(label));
+			if (tipLines && tipLines.length) {
+				var info = element('span', { className: 'sfd-info', tabindex: '0', role: 'img', 'aria-label': label });
+				info.appendChild(iconSvg('help', 13));
+				var tip = element('span', { className: 'sfd-info__tip', role: 'tooltip' });
+				tipLines.forEach(function (line) {
+					var item = element('span', { className: 'sfd-info__line' });
+					item.appendChild(element('b', { text: line[0] }));
+					item.appendChild(document.createTextNode(' ' + line[1]));
+					tip.appendChild(item);
+				});
+				info.appendChild(tip);
+				head.appendChild(info);
+			}
+			row.appendChild(head);
 			row.appendChild(control);
 			return row;
 		}
@@ -3577,8 +3866,15 @@
 		directMenu.appendChild(sfdRow(tr('targetPage', 'Page'), hubPicker.root));
 		directMenu.appendChild(sfdRow(tr('selectDevices', 'Devices'), hubDevBox));
 		directMenu.appendChild(hubError);
-		directMenu.appendChild(sfdRow(tr('resQuality', 'Quality'), hubResSeg));
-		directMenu.appendChild(sfdRow(tr('captureHeight', 'Height'), hubHeightSeg));
+		directMenu.appendChild(sfdRow(tr('resQuality', 'Quality'), hubResSeg, [
+			['1x', tr('res1Tip', 'Normal size. Smallest file.')],
+			['2x', tr('res2Tip', 'Twice the pixels. Sharp on modern screens.')],
+			['3x', tr('res3Tip', 'Three times the pixels. Biggest file.')]
+		]));
+		directMenu.appendChild(sfdRow(tr('captureHeight', 'Height'), hubHeightSeg, [
+			[tr('heightViewport', 'First screen'), tr('heightViewportTip', 'Just what you see without scrolling.')],
+			[tr('heightFull', 'Full page'), tr('heightFullTip', 'The whole page, top to bottom.')]
+		]));
 		directMenu.appendChild(hubAdminLabel);
 		directMenu.appendChild(hubFooter);
 
@@ -3650,6 +3946,7 @@
 		root.appendChild(size);
 		root.appendChild(actions);
 		root.appendChild(bar);
+		root.appendChild(devStrip);
 		root.appendChild(hint);
 		if (document.getElementById('wpadminbar')) {
 			root.classList.add('has-admin-bar');
@@ -3727,9 +4024,11 @@
 				root.classList.remove('is-under-bar');
 				hint.hidden = false;
 				root.classList.remove('is-selecting');
+				updateDevStrip();
 				return;
 			}
 			box.hidden = false;
+			updateDevStrip();
 			box.classList.toggle('is-adjusting', !!sel);
 			// Tiny boxes get tiny handles, so they do not swallow the selection.
 			box.classList.toggle('is-small', rect.width < 90 || rect.height < 90);
@@ -3806,7 +4105,13 @@
 
 		shade.addEventListener('pointerdown', function (event) {
 			touch();
+			// A click outside an open menu only closes it, it never picks what is behind it.
+			var menuWasOpen = root.classList.contains('has-menu-open');
 			closeAllMenus();
+			if (menuWasOpen) {
+				event.preventDefault();
+				return;
+			}
 			if (snipBusy || event.button !== 0) {
 				return;
 			}
@@ -3831,6 +4136,9 @@
 		});
 		shade.addEventListener('pointermove', function (event) {
 			touch();
+			if (root.classList.contains('has-menu-open')) {
+				return;
+			}
 			if (mode === 'window' && !drag && !snipBusy && !sel) {
 				moveEvent = event;
 				if (hoverFrame) {
@@ -3838,7 +4146,7 @@
 				}
 				hoverFrame = window.requestAnimationFrame(function () {
 					hoverFrame = 0;
-					if (mode !== 'window' || drag || snipBusy || !moveEvent || sel) {
+					if (mode !== 'window' || drag || snipBusy || !moveEvent || sel || root.classList.contains('has-menu-open')) {
 						return;
 					}
 					showSelection(rectFromNode(pickWindow(moveEvent.clientX, moveEvent.clientY)));
@@ -3879,11 +4187,16 @@
 
 		function clearSelection() {
 			sel = null;
+			activeDevice = null;
 			adj = null;
 			showSelection(null);
 		}
 
 		function applyAdjust(dx, dy) {
+			if (activeDevice) {
+				activeDevice = null;
+				updateDevStrip();
+			}
 			var o = adj.orig;
 			var view = viewSize();
 			var min = 8;
@@ -4649,6 +4962,8 @@
 		panel = null;
 		dialog = null;
 		statusNode = null;
+		propsNode = null;
+		propsSize = null;
 		compactPanel = false;
 		customButton = null;
 		customInput = null;
@@ -4819,7 +5134,7 @@
 		var search = element('input', {
 			type: 'text',
 			className: 'sfp__search',
-			placeholder: tr('pickSearchPlaceholder', 'Search pages or paste a URL'),
+			placeholder: tr('pickSearchPlaceholder', 'Search pages or paste a URL from this site'),
 			role: 'combobox',
 			'aria-label': tr('pickSearch', 'Search pages'),
 			'aria-expanded': 'true',

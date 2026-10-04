@@ -3184,3 +3184,437 @@ body.stillframe-locked {
 	background: #f4f8fa;
 	border-color: var(--sf-brand);
 }
+
+/* ---- Round close buttons everywhere ---- */
+.stillframe-result .stillframe-btn.stillframe-result__close,
+.stillframe-result .stillframe-result__drawer-close,
+.stillframe-snip .stillframe-snip__reset,
+.stillframe-snip .stillframe-snip__bar .stillframe-snip__close {
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border-radius: 50% !important;
+}
+
+.stillframe-result .stillframe-result__drawer-close {
+	width: 28px;
+	height: 28px;
+}
+
+/* ---- Editor top bar: every control on the right shares one height and corner ---- */
+.stillframe-result .stillframe-result__actions {
+	align-items: center;
+	gap: 8px;
+}
+
+.stillframe-result .stillframe-result__actions .stillframe-btn,
+.stillframe-result .stillframe-result__actions .stillframe-format-select {
+	height: 34px;
+	margin: 0;
+	border-radius: 8px;
+}
+
+.stillframe-result .stillframe-result__actions .stillframe-btn:not(.stillframe-btn-primary):not(.stillframe-result__close) {
+	min-width: 34px;
+}
+
+.stillframe-result .stillframe-result__actions .stillframe-format-select {
+	appearance: none;
+	-webkit-appearance: none;
+	padding: 0 28px 0 12px;
+	font-size: 12.5px;
+	font-weight: 600;
+	line-height: 32px;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+	background-repeat: no-repeat;
+	background-position: right 9px center;
+}
+
+/* ---- Page list: the search box scrolls away with the list ---- */
+.sfp .sfp__drop {
+	max-height: 300px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.sfp .sfp__list {
+	max-height: none;
+	overflow: visible;
+}
+
+/* ---- Hover help next to Quality and Height ---- */
+.sfd-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.sfd-info {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--sf-muted, #6b7280);
+	cursor: help;
+	border-radius: 50%;
+}
+
+.sfd-info:hover,
+.sfd-info:focus-visible {
+	color: var(--sf-brand, #005976);
+	outline: none;
+}
+
+.sfd-info__tip {
+	position: absolute;
+	z-index: 50;
+	left: -6px;
+	bottom: calc(100% + 8px);
+	display: none;
+	width: max-content;
+	max-width: 230px;
+	padding: 8px 10px;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.45;
+	color: #ffffff;
+	background: #14313c;
+	border-radius: 8px;
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+	pointer-events: none;
+}
+
+.sfd-info__tip::after {
+	content: "";
+	position: absolute;
+	left: 10px;
+	top: 100%;
+	border: 5px solid transparent;
+	border-top-color: #14313c;
+}
+
+.sfd-info:hover .sfd-info__tip,
+.sfd-info:focus-visible .sfd-info__tip {
+	display: block;
+}
+
+.sfd-info__line {
+	display: block;
+}
+
+.sfd-info__line b {
+	font-weight: 700;
+}
+
+/* ---- Toast ---- */
+.stillframe-toast {
+	position: fixed;
+	z-index: 1000001;
+	left: 50%;
+	bottom: 24px;
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	max-width: min(520px, calc(100vw - 32px));
+	padding: 10px 16px 10px 11px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.35;
+	color: #1f2937;
+	background: #ffffff;
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.06);
+	opacity: 0;
+	transform: translate(-50%, 10px);
+	pointer-events: none;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.stillframe-toast.is-visible {
+	opacity: 1;
+	transform: translate(-50%, 0);
+	pointer-events: auto;
+}
+
+.stillframe-toast__icon {
+	flex: none;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background-color: #e6f4f8;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 14px 14px;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23005976' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 8v.01M12 12v5'/></svg>");
+}
+
+.stillframe-toast[data-tone="success"] .stillframe-toast__icon {
+	background-color: #005976;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12.5l4.5 4.5L19 7.5'/></svg>");
+}
+
+.stillframe-toast[data-tone="error"] .stillframe-toast__icon {
+	background-color: #fdecea;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b42318' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M12 6v7M12 18v.01'/></svg>");
+}
+
+.stillframe-toast[data-tone="busy"] .stillframe-toast__icon {
+	background-image: none;
+	background-color: transparent;
+	border: 2.5px solid #cfe5ec;
+	border-top-color: #005976;
+	animation: stillframe-toast-spin 0.8s linear infinite;
+}
+
+.stillframe-toast__link {
+	padding-left: 12px;
+	font-weight: 600;
+	color: #005976;
+	text-decoration: none;
+	white-space: nowrap;
+	border-left: 1px solid #e5e7eb;
+}
+
+.stillframe-toast__link:hover {
+	text-decoration: underline;
+}
+
+@keyframes stillframe-toast-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ---- Options for the selected mark ---- */
+.stillframe-result .stillframe-result__props {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 18px;
+	padding: 6px 16px;
+	background: #f9fafb;
+	border-bottom: 1px solid var(--sf-line, #e5e7eb);
+}
+
+.stillframe-result .stillframe-result__props[hidden] {
+	display: none;
+}
+
+.stillframe-result .stillframe-prop {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.stillframe-result .stillframe-prop__label {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--sf-muted, #6b7280);
+}
+
+.stillframe-result .stillframe-prop__select {
+	height: 28px;
+	padding: 0 8px;
+	font-size: 12.5px;
+	color: var(--sf-text-2, #374151);
+	background: #ffffff;
+	border: 1px solid var(--sf-line-strong, #d1d5db);
+	border-radius: 6px;
+}
+
+.stillframe-result .stillframe-prop__color {
+	width: 28px;
+	height: 28px;
+	padding: 2px;
+	background: #ffffff;
+	border: 1px solid var(--sf-line-strong, #d1d5db);
+	border-radius: 50%;
+	cursor: pointer;
+}
+
+.stillframe-result .stillframe-prop__toggle,
+.stillframe-result .stillframe-prop__seg-btn {
+	height: 28px;
+	min-width: 28px;
+	padding: 0 10px;
+	font-size: 12.5px;
+	font-weight: 700;
+	color: var(--sf-text-2, #374151);
+	background: #ffffff;
+	border: 1px solid var(--sf-line-strong, #d1d5db);
+	border-radius: 6px;
+}
+
+.stillframe-result .stillframe-prop__seg {
+	display: inline-flex;
+}
+
+.stillframe-result .stillframe-prop__seg-btn:first-child {
+	border-radius: 6px 0 0 6px;
+}
+
+.stillframe-result .stillframe-prop__seg-btn:last-child {
+	margin-left: -1px;
+	border-radius: 0 6px 6px 0;
+}
+
+.stillframe-result .stillframe-prop__toggle[aria-pressed="true"],
+.stillframe-result .stillframe-prop__seg-btn[aria-pressed="true"] {
+	color: #ffffff;
+	background: var(--sf-brand, #005976);
+	border-color: var(--sf-brand, #005976);
+}
+
+/* ---- Custom colour and thickness slider ---- */
+.stillframe-result .stillframe-swatch-custom {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	cursor: pointer;
+	background: conic-gradient(#ef4444, #facc15, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444);
+	border: 0;
+	border-radius: 50%;
+	box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.18);
+}
+
+.stillframe-result .stillframe-swatch-custom::-webkit-color-swatch-wrapper {
+	padding: 0;
+	opacity: 0;
+}
+
+.stillframe-result .stillframe-swatch-custom::-moz-color-swatch {
+	opacity: 0;
+}
+
+.stillframe-result .stillframe-size-slider {
+	width: 92px;
+	height: 4px;
+	margin: 0 4px;
+	cursor: pointer;
+	accent-color: var(--sf-brand, #005976);
+}
+
+/* ---- Text size control ---- */
+.stillframe-result .stillframe-prop__size {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.stillframe-result .stillframe-prop__range {
+	width: 140px;
+	accent-color: var(--sf-brand, #005976);
+}
+
+.stillframe-result .stillframe-prop__number {
+	width: 58px;
+	height: 28px;
+	padding: 0 6px;
+	font-size: 12.5px;
+	color: var(--sf-text-2, #374151);
+	background: #ffffff;
+	border: 1px solid var(--sf-line-strong, #d1d5db);
+	border-radius: 6px;
+}
+
+/* ---- Top bar controls: exactly one height, whatever WordPress does to selects ---- */
+.stillframe-result .stillframe-result__actions > .stillframe-btn,
+.stillframe-result .stillframe-result__actions > .stillframe-format-select {
+	box-sizing: border-box !important;
+	height: 36px !important;
+	min-height: 36px !important;
+	max-height: 36px !important;
+	margin: 0 !important;
+	line-height: 1 !important;
+	border-radius: 8px;
+}
+
+.stillframe-result .stillframe-result__actions > .stillframe-format-select {
+	padding: 0 28px 0 12px !important;
+	line-height: 34px !important;
+}
+
+.stillframe-result .stillframe-result__actions > .stillframe-btn.stillframe-result__close {
+	width: 36px !important;
+	border-radius: 50% !important;
+}
+
+.stillframe-result .stillframe-result__actions > .stillframe-btn:not(.stillframe-btn-primary):not(.stillframe-result__close) {
+	min-width: 36px;
+}
+
+/* Marks may hang past the picture, so the wrapper must not clip them */
+.stillframe-result .stillframe-capture-panel__canvas-wrap:has(img) {
+	overflow: visible;
+}
+
+.stillframe-result .stillframe-capture-panel__canvas-wrap > img {
+	border-radius: 4px;
+}
+
+/* ---- Device sizes shown in Window mode ---- */
+.stillframe-snip__devstrip {
+	position: fixed;
+	z-index: 7;
+	/* top and left are set from the bar's position, so the strip hangs flush off the bar like a tab */
+	top: 70px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: max-content;
+	max-width: calc(100vw - 16px);
+	margin: 0;
+	padding: 4px 10px 5px 12px;
+	background: var(--sf-surface, #ffffff);
+	border: 1px solid var(--sf-line, #e5e7eb);
+	border-top-color: transparent;
+	border-radius: 0 0 10px 10px;
+	box-shadow: 0 10px 18px -6px rgba(15, 23, 42, 0.22);
+}
+
+.stillframe-snip__devstrip[hidden] {
+	display: none;
+}
+
+.stillframe-snip__devstrip-label {
+	margin-right: 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sf-muted, #6b7280);
+	white-space: nowrap;
+}
+
+.stillframe-snip .stillframe-snip__devstrip-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 30px;
+	padding: 0 10px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--sf-text-2, #374151);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	box-shadow: none;
+}
+
+.stillframe-snip .stillframe-snip__devstrip-btn small {
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--sf-muted, #6b7280);
+}
+
+.stillframe-snip .stillframe-snip__devstrip-btn:hover,
+.stillframe-snip .stillframe-snip__devstrip-btn[aria-pressed="true"] {
+	color: var(--sf-brand, #005976);
+	background: var(--sf-brand-muted, #e6f4f8);
+}

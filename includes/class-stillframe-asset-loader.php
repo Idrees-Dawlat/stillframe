@@ -45,7 +45,7 @@ class Stillframe_Asset_Loader {
 		}
 
 		$style_url = false;
-		wp_register_style( 'stillframe-admin-bar', $style_url, array(), STILLFRAME_VERSION );
+		wp_register_style( 'stillframe-admin-bar', $style_url, array(), STILLFRAME_ASSET_VER );
 		wp_enqueue_style( 'stillframe-admin-bar' );
 		wp_add_inline_style( 'stillframe-admin-bar', $this->admin_bar_css() );
 
@@ -55,7 +55,7 @@ class Stillframe_Asset_Loader {
 			'stillframe-capture-panel',
 			$base . 'assets/css/stillframe-capture-panel.css',
 			array(),
-			STILLFRAME_VERSION
+			STILLFRAME_ASSET_VER
 		);
 
 		/**
@@ -75,7 +75,7 @@ class Stillframe_Asset_Loader {
 				'stillframe-annotation-editor',
 				$base . 'assets/js/stillframe-annotation-editor-v2.js',
 				array( 'stillframe-fabric' ),
-				STILLFRAME_VERSION,
+				STILLFRAME_ASSET_VER,
 				true
 			);
 		} else {
@@ -83,7 +83,7 @@ class Stillframe_Asset_Loader {
 				'stillframe-annotation-editor',
 				$base . 'assets/js/stillframe-annotation-editor.js',
 				array(),
-				STILLFRAME_VERSION,
+				STILLFRAME_ASSET_VER,
 				true
 			);
 		}
@@ -92,7 +92,7 @@ class Stillframe_Asset_Loader {
 			'stillframe-capture-panel',
 			$base . 'assets/js/stillframe-capture-panel.js',
 			array( 'stillframe-annotation-editor' ),
-			STILLFRAME_VERSION,
+			STILLFRAME_ASSET_VER,
 			true
 		);
 
@@ -100,7 +100,7 @@ class Stillframe_Asset_Loader {
 			'stillframe-admin-bar',
 			$base . 'assets/js/stillframe-admin-bar.js',
 			array(),
-			STILLFRAME_VERSION,
+			STILLFRAME_ASSET_VER,
 			true
 		);
 
@@ -136,7 +136,7 @@ class Stillframe_Asset_Loader {
 				'stillframe-tools',
 				$base . 'assets/css/stillframe-tools.css',
 				array(),
-				STILLFRAME_VERSION
+				STILLFRAME_ASSET_VER
 			);
 			wp_enqueue_style( 'stillframe-tools' );
 
@@ -144,7 +144,7 @@ class Stillframe_Asset_Loader {
 				'stillframe-modern-screenshot',
 				$base . 'assets/js/vendor/modern-screenshot.js',
 				array(),
-				STILLFRAME_VERSION,
+				STILLFRAME_ASSET_VER,
 				true
 			);
 			wp_enqueue_script( 'stillframe-modern-screenshot' );
@@ -155,7 +155,7 @@ class Stillframe_Asset_Loader {
 				'stillframe-tools',
 				$base . 'assets/js/stillframe-tools.js',
 				array( 'stillframe-capture-panel', 'stillframe-modern-screenshot' ),
-				STILLFRAME_VERSION,
+				STILLFRAME_ASSET_VER,
 				true
 			);
 			wp_enqueue_script( 'stillframe-tools' );
@@ -488,7 +488,7 @@ class Stillframe_Asset_Loader {
 			'pickCustomPlaceholder' => __( 'Custom URL: paste any address...', 'stillframe' ),
 			'pickCustom'            => __( 'Custom URL', 'stillframe' ),
 			'pickUse'               => __( 'Use', 'stillframe' ),
-			'pickSearchPlaceholder' => __( 'Search pages or paste a URL', 'stillframe' ),
+			'pickSearchPlaceholder' => __( 'Search pages or paste a URL from this site', 'stillframe' ),
 			'pickSearch'            => __( 'Search pages', 'stillframe' ),
 			'pickEnterUrl'          => __( 'Enter a URL below', 'stillframe' ),
 			'pickNoMatch'           => __( 'No matching pages. Paste a full URL to use it.', 'stillframe' ),

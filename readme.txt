@@ -3,7 +3,7 @@ Contributors: idreesdawlat, grafucci
 Tags: screenshot, capture, annotate, media library, responsive
 Requires at least: 6.4
 Tested up to: 7.1
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -88,6 +88,15 @@ Stillframe bundles modern-screenshot 4.7.0 (MIT license) as assets/js/vendor/mod
 Stillframe also bundles Fabric.js 6.7.1 (MIT license) as assets/js/vendor/fabric.min.js. Source: https://github.com/fabricjs/fabric.js (npm package "fabric"). The license text is in assets/js/vendor/LICENSE-fabric.txt.
 
 == Changelog ==
+
+= 0.2.1 =
+* Text marks stretch freely: the corner handles scale the text evenly, the side handles stretch it wider or narrower, and the top and bottom handles make it taller or shorter. The Size control keeps showing the real letter height.
+* Marks can now be dragged and resized out over the grey area around the picture. The part outside the picture is shown faded, and only the picture itself is saved.
+* Every handle of a mark stays visible and reachable: a mark can no longer be pushed or resized past the edge of the working area.
+* Smaller, lighter transform handles and a closer rotate knob on every mark; a thinner white outline on large text.
+* Device frame: Desktop, iPad and Mobile frames keep their proportions on small screens, no longer sit under the top bar, and the device buttons stay available so the size can be switched after framing.
+* The device buttons in Window mode now hang directly under the top bar, centred on it.
+* Scripts and styles are versioned by file date, so an updated plugin never serves a stale cached copy.
 
 = 0.2.0 =
 * Multi-Device Studio: Added full studio under Tools > Stillframe to batch capture Desktop (1440px), iPad/Tablet (834px), and Mobile Phone (390px) views simultaneously.
